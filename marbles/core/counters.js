@@ -77,6 +77,9 @@ function triggerCounter(trigger) {
     listenable: true,
     count(event, context) {
       if (event.type !== trigger.event || !triggerOccurs(trigger, event) || locked(context, "trigger", trigger.id)) return 0;
+      // Une bille qui quitte le pot verrouillé se tait (`potLock`, la Perte d'un
+      // débordement) : comme son effet, son compteur ne bouge pas.
+      if (trigger.potLock === true && event.from === "pot" && locked(context, "pot")) return 0;
       if (trigger.scope === "any") return Object.values(context.state?.triangle ?? {}).filter((placed) => placed !== null && hasField(context.types, placed.marble, trigger.field)).length;
       return hasField(context.types, event.marble, trigger.field) ? 1 : 0;
     },

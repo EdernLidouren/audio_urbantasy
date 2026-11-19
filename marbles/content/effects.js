@@ -98,6 +98,11 @@ export const not = (condition) => ({ ...condition, not: true });
 // slotIs(NEXT_SLOT, "empty"), « si l'emplacement suivant est vide ».
 export const slotIs = (slot, state) => ({ type: "slotIs", slot, state });
 
+// La bille concernée par un Polissage ou une Fêlure, qui réagissent pour toute bille
+// active : "self", cette bille ; "other", une autre. concerned("self"), « si c'est
+// cette bille qui est visée ».
+export const concerned = (is) => ({ type: "concerned", is });
+
 // Pendant un remplacement (Tic, Éjection), le calibre de la bille éjectée ("ejected")
 // ou de celle qui l'éjecte ("placed"), une condition (`when`) :
 // replacementSize("ejected", SMALL), « si la bille éjectée est une minibille ».

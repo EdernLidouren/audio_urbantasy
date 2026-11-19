@@ -200,12 +200,30 @@ chaque palier franchi, après l'Impact.
 Le pot tel que le joueur le vit : `doc/marbles-rules.md`, section 9, « Le pot ». Deux
 zones de l'état, sérialisées (`marbles/core/marbles.js`, en-tête) :
 
-- `pot` : les billes en poche, dans l'ordre d'arrivée, au plus la capacité en vigueur
-  à leur arrivée (`potCapacity`, valeur de départ de la définition, plus les statuts :
-  `marbles/core/statuses.js`/`characteristic`) ;
-- `lost` : les **billes perdues**, envoyées au pot plein.
+- `pot` : les billes en poche, dans l'ordre d'arrivée, jamais au-delà de la capacité en
+  vigueur après une arrivée (`potCapacity`, valeur de départ de la définition, plus les
+  statuts : `marbles/core/statuses.js`/`characteristic`) ;
+- `lost` : les **billes perdues**, sorties de la partie : poussées hors du pot par un
+  débordement.
 
-Aucune bille ne quitte aujourd'hui l'une ou l'autre, ni ne revient au sac à un mélange.
+**Le débordement** (`marbles/core/path.js`/`sendToPot`) : une bille qui arrive au pot y
+entre toujours ; s'il dépasse alors sa capacité, il déborde, et ses billes les plus
+anciennes en sortent, une par une, jusqu'à sa capacité. Chacune se perd (`lost`, cause
+`"overflow"`, `from: "pot"`, `index: 0`) et sa **Perte** se règle (une interruption,
+réactions comprises) ; puis l'entrée de la nouvelle (`pocketed`, à sa place `potIndex`,
+comptée depuis la fin : une bille empochée par une réaction pendant les pertes est
+derrière elle, `run.potArrivals`). Une capacité 0 pousse dehors la nouvelle elle-même :
+`lost` depuis sa zone d'origine, sans entrée. Seul l'arrivant compte pour Empocher
+(`arrivesAtPot` : la plus ancienne poussée dehors n'est pas une mise en poche) ; le
+compteur d'évènement `overflows` compte une perte par débordement. Aucune bille ne
+revient au sac à un mélange.
+
+**La Perte** (`loss`, `MARBLE_TRIGGERS`, bille `"lost"`, zone `HOLDER_ZONES.lost`) : la
+bille que nomme `lost`, sans emplacement (ni cible relative, `NO_REFERENCE_ZONES`, ni
+action sur elle-même) ; ses effets jouent comme un Final. `potLock: true` : sortie du pot
+(`from: "pot"`), le verrou du pot (« pot inerte ») la fait taire, effet et compteur
+(`marbles/core/run.js`/`handleEvent`, `counters.js`/`triggerCounter`). Sa prévision
+(`forecast.line: "pocket"`) : chez l'effet qui empoche, avec la perte (`pockets[].loss`).
 
 **Empocher** (`pocket`, sans montant) déplace une bille vers le pot, depuis là où elle
 est. Sa cible :
@@ -224,9 +242,9 @@ au journal (`targetEmpty`, « Main vide : rien à empocher. »). Le déplacement
 chemin des billes : depuis le triangle, `removed` (cause `"pocket"`), ni Final ni
 Éjection ; empochée pendant sa propre Éjection ou son propre Final, la bille va au pot
 sans passer par la défausse (`redirected`, puis son arrivée, `redirected: true`). À
-l'arrivée, `pocketed` (« X est mise en poche. »), puis son entrée au pot ; pot plein,
-`lost` (« Le pot est plein : X est perdue. »), rien d'autre. Une perte se règle comme
-toute arrivée.
+l'arrivée, `pocketed` (« X est mise en poche. »), puis son entrée au pot ; pot plein, le
+débordement d'abord (`lost`, « Le pot déborde : Y est perdue. », et la Perte de Y). Une
+perte se règle comme toute arrivée.
 
 **En poche** (`pocketed`) est un champ de bille, un objet de **moments**, déclarés une fois
 dans `marbles/config/values.js`/`MARBLE_POCKET` :
@@ -289,8 +307,8 @@ poche », et section 12, « Les réactions des statuts ».
   après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée (pour une
   même bille, dans l'ordre des valeurs de partie) ; puis les statuts, dans l'ordre
   d'acquisition. Le même ordre partout : la pioche du tour comme une Pioche d'effet, un
-  retrait à l'étape des retraits comme par une Fêlure ; une perte au pot plein se règle
-  comme toute arrivée.
+  retrait à l'étape des retraits comme par une Fêlure ; une perte par débordement se
+  règle comme toute arrivée, avant l'entrée de la bille qui l'a provoquée.
 - **Le mécanisme** : les réactions sont relevées à l'émission (`reactionsOf`, sur le pot
   et les statuts de cet instant : une source arrivée plus tard ne réagit pas à ce qui
   l'a précédée), puis émises dans la file après le traitement de l'évènement
@@ -344,8 +362,8 @@ bille ». Toute sortie d'une bille de sa zone passe par **un seul déroulé**
    ses compteurs.
 4. **Arrivée** : à la défausse (`discarded`, une interruption, `from` : `"triangle"` et son
    `slot`, `"hand"` ou `"discard"` et son `index`, et sa `cause`), où sa **Chute** joue
-   (son déclencheur d'arrivée) ; au pot (`pocketed`, son entrée ; pot plein, `lost`, sans
-   entrée) ; en main (`returned`, à 0 tour en main, à la place `handIndex`, sans
+   (son déclencheur d'arrivée) ; au pot (`pocketed`, son entrée ; pot plein, il déborde
+   d'abord : `lost` de la plus ancienne, sa Perte) ; en main (`returned`, à 0 tour en main, à la place `handIndex`, sans
    déclencheur ; main pleine, la défausse à la place, `discarded` avec `handFull`). Toute
    arrivée porte son origine : `from` et sa place (`slot` depuis le triangle, `index`
    depuis la main ou la défausse).
@@ -657,6 +675,7 @@ Tic ou une Éjection, le remplacement en cours.
 | `{ type: "replacementSize", marble, size }` (`replacementSize(bille, calibre)`) | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, celle qui l'éjecte : la posée, ou la bille d'un effet Éjecter) est de calibre `size` ; sans bille (un statut qui éjecte) : faux | « Tic : Vitesse +4 si la bille éjectée est une minibille. », « Éjection : Empocher cette bille si la bille qui l'éjecte est un calot. » |
 | `{ type: "count", source, atLeast \| atMost }` (`count(source, { atLeast })`) | la valeur de `source`, une source de montant (`AMOUNT_SOURCES` : `zoneCount`, `familyCount`, `tally`, `turnsInHand`), est au moins `atLeast` ou au plus `atMost` (une borne exactement, un entier) ; son texte, par sorte de source (`COUNT_TEXTS` de la vue, une source sans texte échoue au chargement) | « si vous avez au plus 3 billes en main », « si le pot compte au moins 3 abeilles » |
 | `{ type: "stat", stat, atLeast \| atMost }` (`statIs(compteur, { atMost })`) | le compteur du tour `stat` (`speed`, `mass`), tel qu'il est au déclenchement, avant l'effet qui le lit, respecte la borne | « Base : Masse +1 si la Vitesse est d'au moins 10, sinon Vitesse +2. » |
+| `{ type: "concerned", is }` (`concerned("self")`) | dans un déclencheur de portée `any` seulement (Polissage, Fêlure) : la bille visée par l'évènement est celle qui joue l'effet (`self`) ou une autre (`other`) | « Polissage : Vitesse +3 si c'est cette bille qui est visée. » |
 | `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Base : Polir de 1 la bille de l'emplacement suivant si le triangle est plein. » (tortue), « En poche, à chaque résolution : Masse +1 si le pot est plein. » (lingotin) |
 
 **La négation** : `not: true` (forme courte `not(condition)`) sur une condition qui le déclare (`negatable` : `sizeAt`, `familyAt`, `rarityAt`, `marbleAt`, `replacementSize`) ; refusée ailleurs au chargement. La condition niée est vraie quand son test est faux, emplacement vide compris (« n'est pas de la famille Bestiaire »). Ses textes reçoivent `{not}` (`yes`, `no`). Le test passe par `conditionHolds`, jamais par `CONDITIONS[…].test` seul.
@@ -769,14 +788,18 @@ minibilles actives » ; une forme déclarée dans `data/i18n/grammar.json`).
 ### Polissage et Fêlure reçus
 
 Deux déclencheurs sur le triangle (`MARBLE_TRIGGERS`, champs `polished` et `cracked`),
-qui portent les noms des actions Polissage et Fêlure (leurs textes disent le
-déclencheur ; la touche E décrit l'un et l'autre, deux entrées) :
+en miroir, les noms des évènements que produisent les actions Polir et Fêler (la touche
+E décrit le déclencheur et l'action, deux entrées) :
 
-- **Polissage reçu** (`polished`, portée `self`) : la bille de l'emplacement de
-  l'évènement `polished`, si elle a ce champ ;
-- **Fêlure reçue** (`cracked`, portée `scope: "any"`) : à chaque évènement `cracked`,
-  chaque bille active qui a ce champ, elle comprise, dans l'ordre horaire
-  (`marbleListeners`).
+- **Polissage** (`polished`) et **Fêlure** (`cracked`), portée `scope: "any"` : à chaque
+  évènement `polished` ou `cracked`, chaque bille active qui a ce champ, elle comprise,
+  dans l'ordre horaire (`marbleListeners`) ;
+- une bille qui ne réagit qu'à elle-même, ou qu'aux autres, le précise par la condition
+  `concerned` (`{ type: "concerned", is: "self" | "other" }`, forme courte
+  `concerned("self")`, « si c'est cette bille qui est visée ») : elle compare
+  l'emplacement de la bille qui joue (`holder.slot`) à celui de l'évènement
+  (`situation.concerned`) ; refusée au chargement hors d'un déclencheur de portée `any`
+  (le contexte de validation porte `scope`).
 
 Tous deux exigent une usure vraiment changée (`atLeast: { applied: 1 }`, lu par
 `counters.js`/`triggerOccurs`, côté écouteurs comme côté compteurs) : polir une bille à
@@ -1485,7 +1508,8 @@ pendant la résolution, son effet à chaque résolution et ses réactions regrou
 (valeurs additionnées, actions et résultats à la suite, par `potIndex`), dans l'ordre
 d'arrivée, une bille qui ne joue rien absente ; `potReactions`, de même pour les réactions
 pendant l'action envisagée (la pose) ; chaque effet prévu porte, s'il a empoché, `pockets`
-(`{ marble, lost, entry }`, la bille déplacée, perdue ou non, et l'effet de son entrée),
+(`{ marble, lost, entry, loss }`, la bille déplacée ou celle qu'un débordement a perdue,
+l'effet de son entrée, et celui de sa Perte),
 rattaché à l'effet qui l'a produite (le `by` de `pocketed` et `lost`). `cleared` compte
 aussi une bille empochée avant sa phase.
 
@@ -1608,8 +1632,8 @@ un emplacement, occupé ou non par une bille B :
 4. sur un emplacement occupé, « Tic de A : Vitesse +2 », ou « … : aucun effet ». Un
    Empocher prévu s'y dit chez la bille qui le produit, avec ce qu'il déplace et l'entrée
    au pot : « Tic de A : Vitesse +4 et Empocher la première bille de la main, puis
-   X en poche, à l'entrée : Vitesse +10 » (pot plein : « …, puis pot plein :
-   X perdue ») ; une cible vide, de même, avant (« …, main vide ») ; de même
+   X en poche, à l'entrée : Vitesse +10 » (pot plein : « …, puis le pot déborde :
+   Y perdue, Perte : Vitesse +2, et X en poche… ») ; une cible vide, de même, avant (« …, main vide ») ; de même
    dans les valeurs prévues de la bille posée ;
 5. sur un emplacement occupé, « Éjection de B : Vitesse +3 », ou « … : aucun effet » ;
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
@@ -1739,8 +1763,8 @@ L'annonce d'une bille, dans ces menus comme dans la main et les choix, dit ses
 familles et sa rareté après son calibre (`marbleListLine`) : « rubis, normale, Trésor,
 rare, usure 4. 1 sur 3 » ; V et F y marchent aussi (voir « Description et identité (V,
 F) »).
-**P** dit le pot : « 2 billes sur 3 dans le pot, 1 bille perdue. » (`describePot`, la
-capacité en vigueur, accords compris). Le menu du pot suit l'ordre d'arrivée ; les
+**P** dit le pot : « 2 billes dans le pot, 1 bille perdue. » (`describePot`, accords
+compris ; sa capacité se dit avec C). Le menu du pot suit l'ordre d'arrivée ; les
 billes perdues n'ont pas de menu.
 
 Le menu du sac se dit par ordre alphabétique (`bagDisplayOrder`) : l'ordre ne dépend que
@@ -1811,8 +1835,8 @@ chacune :
    qui l'ont provoqué), pendant la résolution comme pendant une pose (« Chiquenaude de
    Y : … », puis « Pot, X : Vitesse +2. », puis « Ferveur : Vitesse +2. »), et entre dans
    l'historique ; une mise en poche se dit après l'effet qui la produit (« X est mise en
-   poche. », « Entrée au pot de X : Vitesse +10. Vitesse 10, Masse 1. », ou « Le pot est
-   plein : X est perdue. ») ; une phase qui pioche est suivie de sa pioche (« Base
+   poche. », « Entrée au pot de X : Vitesse +10. Vitesse 10, Masse 1. », ou, pot plein, « Le pot
+   déborde : Y est perdue. » avant l'arrivée de X) ; une phase qui pioche est suivie de sa pioche (« Base
    gauche, X : Piocher 1. », « Vous piochez Y. ») ; Polir ou Fêler, de son
    application (« X se fêle : usure 2 sur 2. », « X est polie : usure 1 sur 2. »,
    « Pointe, vide : sans effet. ») et des retraits qu'une Fêlure provoque, avec leur

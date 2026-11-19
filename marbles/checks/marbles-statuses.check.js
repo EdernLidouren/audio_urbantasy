@@ -314,7 +314,7 @@ function checkCharacteristics(run) {
   run("pot au-delà de sa capacité : plein", true, full(potState(["plain", "plain", "plain", "plain"], [])));
   const pocketer = fabricatedRules({ ...TABLE, pocketer: { flick: [{ action: "pocket", target: "firstInHand" }] } });
   const over = mustReduce(pocketer, { ...game({ hand: inHand(["pocketer", "plain"]), pot: ["plain", "plain", "plain", "plain"] }), statuses: [] }, toApex);
-  run.same("pot au-delà : la bille empochée est perdue, aucune n'en sort", [4, 1], [over.state.pot.length, over.state.lost.length]);
+  run.same("pot au-delà : il déborde jusqu'à sa capacité, les deux plus anciennes perdues", [3, 2], [over.state.pot.length, over.state.lost.length]);
   const roomy = mustReduce(pocketer, { ...game({ hand: inHand(["pocketer", "plain"]), pot: ["plain", "plain", "plain"] }), statuses: [instance("pot_game", { remaining: null })] }, toApex);
   run("pot agrandi : la bille entre", 4, roomy.state.pot.length);
   // La main pleine se lit à la taille en vigueur : 3 sur 5, réduite à 3, pleine.

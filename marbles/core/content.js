@@ -24,7 +24,7 @@
 //   polished { slot, marble, amount, applied, wear, maxWear, retires },
 //   cracked { slot, marble, amount, applied, wear, maxWear, retires },
 //   targetEmpty { action, slot, target?, marble?, by },
-//   pocketed { marble, from, slot?, index?, potIndex, by }, lost { marble, from, slot?, index?, by },
+//   pocketed { marble, from, slot?, index?, potIndex, by }, lost { marble, from, slot?, index?, cause, by },
 //   potResolution { index, marble }, pocketReaction { index, marble, counter },
 //   chainInterrupted {},
 //   choice { action, amount?, zones, pick, count, mode, by },
@@ -98,9 +98,13 @@
 // `pocketed` : une bille entre au pot (Empocher) depuis `from` ("triangle", et son
 // `slot` ; "hand" ou "discard", et son `index`), produite par l'effet `by`
 // ({ trigger, slot, marble }) ; `potIndex`, sa place d'arrivée au pot (la dernière) ;
-// ses effets d'entrée (En poche) se règlent aussitôt, une interruption. `lost` : la même, le pot étant plein : perdue, sans effet
-// d'entrée. Depuis le triangle, un `removed` de cause "pocket" les précède : ce
-// n'est ni une usure ni une éjection, ni Final ni Éjection.
+// ses effets d'entrée (En poche) se règlent aussitôt, une interruption. Depuis le
+// triangle, un `removed` de cause "pocket" la précède : ce n'est ni une usure ni une
+// éjection, ni Final ni Éjection. `lost` : une bille PERDUE, sortie de la partie,
+// cause "overflow" : le pot, plein à une arrivée, DÉBORDE, et la plus ancienne en
+// sort (`from` "pot", `index` 0), avant l'entrée de la nouvelle ; un pot de capacité
+// 0 perd la nouvelle elle-même, depuis sa zone (`from` comme `pocketed`). Sa Perte se
+// règle aussitôt (marbles/core/path.js/sendToPot).
 // `potResolution` : une fois par tour, après les phases et avant les retraits,
 // chaque bille du pot dans l'ordre d'arrivée (`index`), pour son effet En poche à
 // chaque résolution.
@@ -224,7 +228,7 @@ export const JOURNAL_EVENTS = Object.freeze({
 
 // Les champs d'effet de PHASE d'une bille, à part des déclencheurs.
 const PHASE_FIELDS = MARBLE_PHASES.map((phase) => phase.field);
-const TRIGGER_MARBLES = ["onSlot", "leaving", "dropped", "thrown", "drawn"];
+const TRIGGER_MARBLES = ["onSlot", "leaving", "dropped", "thrown", "drawn", "lost"];
 const TRIGGER_MOMENTS = ["play", "afterPhases", "anytime"];
 const PLACEMENT_MARBLES = ["occupant", "placed"];
 
@@ -238,7 +242,8 @@ export function validateMarbleTriggers(triggers) {
   const seen = { id: new Set(), field: new Set(), event: new Set() };
   for (const trigger of triggers) {
     const describe = `déclencheur "${trigger.id}"`;
-    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "replacement", "scope", "atLeast", "forecast", "texts", "card"], describe, fail);
+    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "replacement", "scope", "atLeast", "potLock", "forecast", "texts", "card"], describe, fail);
+    if (trigger.potLock !== undefined && trigger.potLock !== true) fail(`${describe} : potLock vaut true, ou rien.`);
     if (trigger.replacement !== undefined && typeof trigger.replacement !== "boolean") fail(`${describe} : replacement doit valoir true ou false.`);
     if (trigger.scope !== undefined && !["self", "any"].includes(trigger.scope)) fail(`${describe} : scope inconnu "${trigger.scope}" (self, any).`);
     if (trigger.scope !== undefined && trigger.marble !== "onSlot") fail(`${describe} : scope ne vaut que pour une bille sur le triangle (onSlot).`);
@@ -264,10 +269,10 @@ export function validateMarbleTriggers(triggers) {
     } else if (forecast?.line === "slot" || forecast?.line === "regeneration") {
       rejectUnknownFields(forecast, ["line"], describe, fail);
       if (typeof texts[forecast.line] !== "string") fail(`${describe} : texte ${forecast.line} obligatoire.`);
-    } else if (forecast?.line === "none") {
+    } else if (forecast?.line === "none" || forecast?.line === "pocket") {
       rejectUnknownFields(forecast, ["line"], describe, fail);
     } else {
-      fail(`${describe} : forecast.line doit valoir "placement", "slot", "regeneration" ou "none".`);
+      fail(`${describe} : forecast.line doit valoir "placement", "slot", "regeneration", "pocket" ou "none".`);
     }
     if (trigger.card !== undefined && trigger.card !== "below") fail(`${describe} : card doit valoir "below".`);
   }

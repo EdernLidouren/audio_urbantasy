@@ -99,7 +99,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureDefinition, fixtureRules } from "./fixtures/marbles.js";
-import { NEXT_SLOT, bounce, choice, crack, draw, polish, speed } from "../content/effects.js";
+import { NEXT_SLOT, bounce, choice, concerned, crack, draw, polish, speed } from "../content/effects.js";
 import { ruleInstance } from "../core/statuses.js";
 import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, overState, statusInstance } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
@@ -565,7 +565,7 @@ function checkKeywords(run) {
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "polished", "cracked", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "applyStatus", "apex", "base"],
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "polished", "cracked", "loss", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "applyStatus", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 
@@ -1995,6 +1995,7 @@ const WITNESSES = {
       "Fêler de 1 jusqu'à 2 billes actives au choix",
       "Faire rebondir cette bille",
       "Piocher 2",
+      "Vitesse +3 si c'est cette bille qui est visée",
     ],
   },
   en: {
@@ -2047,6 +2048,7 @@ const WITNESSES = {
       "Crack 1 on up to 2 active marbles, your choice",
       "Bounce this marble",
       "Draw 2",
+      "Speed +3 if this marble is the one targeted",
     ],
   },
 };
@@ -2109,6 +2111,7 @@ function checkWitnesses(run) {
         [crack(1, choice({ zones: ["triangle"], count: 2, mode: "optional" }))],
         [bounce()],
         [draw(2)],
+        [{ ...speed(3), when: concerned("self") }],
       ].map((clauses) => plain(describePrinted(clauses, null, realT))),
     };
   };

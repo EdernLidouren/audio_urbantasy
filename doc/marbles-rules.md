@@ -20,7 +20,7 @@ Une partie se joue selon sa **définition** (section 13) : ses valeurs de dépar
 - **L'ordre horaire** : le seul ordre des emplacements, base droite, base gauche, pointe, puis de nouveau base droite. Il définit l'emplacement suivant (de la base droite à la base gauche, de la base gauche à la pointe, de la pointe à la base droite) et l'emplacement précédent (le sens inverse). Tout ce qui parcourt le triangle le suit : les phases, les retraits, les billes visées ensemble, les réactions des billes.
 - **La défausse** : les billes qui ont quitté le triangle. Quand le sac est vide, la défausse est mélangée et devient le nouveau sac.
 - **Le pot** : les billes empochées par un effet. Elles y restent toute la partie et leurs effets En poche y jouent.
-- **Les billes perdues** : les billes envoyées au pot alors qu'il était plein. Elles sont perdues pour la partie et n'ont plus aucun effet.
+- **Les billes perdues** : les billes sorties de la partie, aujourd'hui poussées hors du pot par un débordement. Elles n'ont plus aucun effet, sauf leur Perte, au moment où elles sortent.
 
 ### Les billes et leurs états
 
@@ -29,7 +29,7 @@ Une partie se joue selon sa **définition** (section 13) : ses valeurs de dépar
 - **Active** : une bille posée sur un emplacement du triangle. Elle seule a une usure.
 - **Morte** : une bille dans la défausse. Elle redevient dormante quand la défausse est mélangée et devient le sac.
 - **En poche** : une bille dans le pot.
-- **Perdue** : une bille envoyée au pot plein.
+- **Perdue** : une bille sortie de la partie.
 
 Une bille ne garde rien en changeant de zone : en quittant le triangle, elle perd son usure et son bonus ; en quittant la main, elle perd son compteur de tours en main. Seuls ses propres effets de départ (son Final, son Éjection, sa Chute) et le Tic de la bille qui la chasse lisent encore l'usure et les tours passés sur le triangle qu'elle avait en partant.
 
@@ -192,7 +192,7 @@ Toute sortie d'une bille de sa zone suit le même chemin, dans cet ordre :
 1. **Le départ** : la bille quitte sa zone et devient en partance. Ce départ est acquis : rien ne l'annule.
 2. **Le déclencheur de sortie**, s'il y en a un : le Final (une sortie par usure) ou l'Éjection (un remplacement, Éjecter). Il joue entièrement, avec tout ce qu'il déclenche, pendant que la bille est en partance. Pour un remplacement, la bille posée arrive et son Tic joue d'abord, la bille chassée déjà en partance.
 3. **La destination** : la défausse, sauf si un effet l'a redirigée pendant qu'elle était en partance : un effet de la bille elle-même, pendant son déclencheur de sortie, ou le Tic de la bille qui la chasse (Empocher : le pot ; Rebondir : la main). Si plusieurs effets la redirigent, le dernier l'emporte : son Éjection, qui joue après le Tic, a le dernier mot. Une action qui déplace une bille (Empocher, Défausser, Rebond, Ramasser) pose elle-même sa destination.
-4. **L'arrivée** : la bille entre dans sa destination. À la défausse, sa Chute joue. Au pot, son effet d'entrée joue ; si le pot est plein, elle est perdue, sans effet d'entrée. En main, rien ne se déclenche ; si la main est pleine, elle arrive à la défausse à la place.
+4. **L'arrivée** : la bille entre dans sa destination. À la défausse, sa Chute joue. Au pot, son effet d'entrée joue ; si le pot est plein, il déborde d'abord : sa bille la plus ancienne sort et se perd, puis l'effet d'entrée de la nouvelle joue. En main, rien ne se déclenche ; si la main est pleine, elle arrive à la défausse à la place.
 
 Pendant son Final ou son Éjection, une bille ne peut ni se polir ni se fêler : son départ est acquis. Elle n'est pas encore à la défausse : un effet Piocher de son Final qui mélange la défausse ne la remet pas dans le sac, et le Tic qui la chasse ne peut ni la piocher ni la ramasser. Une bille ne passe ainsi qu'une fois d'une zone à l'autre : empochée pendant sa propre Éjection ou son propre Final, elle va au pot sans passer par la défausse.
 
@@ -203,7 +203,7 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
 Trois sortes de mots, chacune avec sa forme, pour qu'on entende tout de suite si une bille agit ou subit :
 
 - **Un évènement** est un fait, ce qui arrive à une bille ou à la partie. Il se dit au participe pour une bille (« bille éjectée », « bille piochée », « bille empochée ») et par un nom pour la partie (« mélange », « remplacement »). C'est ce que comptent les valeurs de partie (section 10), et ce qu'on écoute avec « à chaque … ».
-- **Un déclencheur** est la réaction d'une bille à un évènement qui la concerne. C'est un nom, avec une majuscule : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, Polissage, Fêlure. Ses déclenchements se comptent par son nom : « à chaque Éjection déclenchée ».
+- **Un déclencheur** est la réaction d'une bille à un évènement. C'est un nom, avec une majuscule : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, Polissage, Fêlure. La plupart ne concernent que leur bille (elle est piochée, lancée, éjectée…) ; Polissage et Fêlure, en miroir, réagissent par défaut pour toute bille active, et une bille qui ne réagit qu'à elle-même le précise (« si c'est cette bille qui est visée »). Ses déclenchements se comptent par son nom : « à chaque Éjection déclenchée ».
 - **Une action** est ce que fait un effet. C'est un verbe : Piocher, Polir, Fêler, Empocher, Éjecter, Défausser, Rebondir, Ramasser, Appliquer un statut. Ses effets se comptent par son nom, « à chaque effet Éjecter », et ce qu'elle déplace par effet, « à chaque bille éjectée par effet ».
 
 Un même radical peut servir aux trois sans confusion : la bille éjectée (l'évènement), son Éjection (le déclencheur), Éjecter (l'action). En anglais, où le nom et le verbe se confondent, un déclencheur qui a la même racine qu'une action prend le participe : Polished, Cracked.
@@ -228,12 +228,14 @@ Un même radical peut servir aux trois sans confusion : la bille éjectée (l'é
   - Moment : à son retrait par usure, à l'étape des retraits ou aussitôt après un effet Fêler. Jamais à un remplacement, à un échange, à une éjection ni à une mise en poche.
 - Chute : se déclenche quand la bille arrive à la défausse, d'où qu'elle vienne.
   - Moment : à son arrivée à la défausse, au bout de son chemin : après son Final ou son Éjection s'il y en a un, depuis le triangle, la main ou le sac. Jamais si un effet l'a envoyée ailleurs (au pot). Ses valeurs vont aux compteurs du tour. À la défausse, Empocher sur elle-même l'envoie au pot.
-- Polissage : se déclenche quand cette bille, sur le triangle, est polie d'au moins 1 point d'usure.
-  - Moment : juste après l'effet Polir qui l'a polie, à tout moment du tour, comme la Trouvaille. Un effet Polir qui ne retire rien (la bille à usure 0) ne le déclenche pas. Le déclencheur est un nom, Polissage ; l'action, un verbe, Polir.
+- Polissage : se déclenche quand une bille active, celle-ci comprise, est polie d'au moins 1 point d'usure.
+  - Moment : juste après l'effet Polir, à tout moment du tour, comme la Trouvaille. Chaque bille active qui a cet effet réagit, dans l'ordre horaire, en miroir de la Fêlure. Un effet Polir qui ne retire rien (la bille à usure 0) ne le déclenche pas. Une bille qui ne veut réagir qu'à son propre polissage le précise : « Polissage : Vitesse +3 si c'est cette bille qui est visée ». Le déclencheur est un nom, Polissage ; l'action, un verbe, Polir.
 - Fêlure : se déclenche quand une bille active, celle-ci comprise, est fêlée d'au moins 1 point d'usure.
-  - Moment : juste après l'effet Fêler, à tout moment du tour. Chaque bille active qui a cet effet réagit, dans l'ordre horaire ; une bille que l'effet Fêler a amenée à son maximum est déjà partie, et ne réagit plus. Le déclencheur est un nom, Fêlure ; l'action, un verbe, Fêler.
+  - Moment : juste après l'effet Fêler, à tout moment du tour. Chaque bille active qui a cet effet réagit, dans l'ordre horaire ; une bille que l'effet Fêler a amenée à son maximum est déjà partie, et ne réagit plus. La même précision qu'au Polissage vaut ici. Le déclencheur est un nom, Fêlure ; l'action, un verbe, Fêler.
 - En poche : effets actifs uniquement lorsque la bille est dans le pot : à son entrée, à chaque résolution, ou en réaction à ce qui se passe pendant la partie.
-  - Trois moments : à l'entrée au pot, juste après l'arrivée de la bille (jamais si elle est perdue) ; à chaque résolution, à l'étape du pot ; à chaque occurrence d'un évènement de la partie, une réaction (section 9).
+  - Trois moments : à l'entrée au pot, juste après l'arrivée de la bille, et après la perte qu'un débordement provoque (jamais si elle est perdue elle-même) ; à chaque résolution, à l'étape du pot ; à chaque occurrence d'un évènement de la partie, une réaction (section 9).
+- Perte : se déclenche quand la bille est perdue, au moment où elle quitte la partie ; un pot qui déborde perd sa bille la plus ancienne.
+  - Moment : quand elle quitte la partie, comme un Final : poussée hors du pot par un débordement, avant l'entrée de la bille qui la pousse ; dans un pot de capacité 0, la bille qui arrive se perd elle-même, depuis là d'où elle venait. Elle est alors parmi les billes perdues : ni emplacement de référence, ni action sur elle-même. Le pot inerte fait taire la Perte d'une bille qui sort du pot, comme les autres effets du pot.
 
 ### Les mots-clés d'action
 
@@ -243,7 +245,7 @@ Un même radical peut servir aux trois sans confusion : la bille éjectée (l'é
   - Cible : la bille elle-même, un emplacement, ou des billes actives au choix. Se dit « Polir de 1 cette bille », « Polir de 1 la bille de l'emplacement suivant ».
 - Fêler : ajoute de l'usure à une bille. Si elle atteint son maximum, la bille est usée et quitte aussitôt le triangle.
   - Cible : la bille elle-même, un emplacement, ou des billes actives au choix. Se dit « Fêler de 1 la bille en pointe ».
-- Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main, dans la défausse ou, pendant un Tic, la bille qu'il vient de chasser. Si le pot est plein, la bille est perdue pour la partie.
+- Empocher : envoie une bille au pot, où qu'elle soit : sur le triangle, en main, dans la défausse ou, pendant un Tic, la bille qu'il vient de chasser. Si le pot est plein, il déborde : sa bille la plus ancienne est perdue.
   - Cible : la bille elle-même, où qu'elle soit (sauf en cours de lancer et dans le pot ; en partance, pendant son Final ou son Éjection, elle est redirigée vers le pot) ; un emplacement ; la première bille de la main ; une bille au choix, de la main ou du triangle ; dans un Tic seulement, la bille éjectée, en partance, redirigée vers le pot.
 - Éjecter : chasse une bille du triangle : son effet d'éjection se déclenche, puis elle part à la défausse.
   - Cible : la bille elle-même, seulement si elle est sur le triangle, jamais dans son Final ni dans sa propre Éjection, où elle est en partance ; un emplacement ; des billes actives au choix ; ou toutes les billes actives, éventuellement d'un seul calibre, d'une seule famille ou d'une seule rareté (« toutes les minibilles actives », « toutes les billes Brume actives »).
@@ -334,6 +336,7 @@ Une clause peut porter une condition, évaluée au moment où l'effet joue ; fau
 - **le calibre d'une bille d'un remplacement**, pendant un remplacement seulement : la bille éjectée, ou celle qui l'éjecte (la bille posée, ou la bille d'un effet Éjecter), est d'un calibre donné. « Tic : Vitesse +4 si la bille éjectée est une minibille. », « Éjection : Empocher cette bille si la bille qui l'éjecte est un calot. » ;
 - **un nombre comparé à une borne**, au moins ou au plus : le nombre de billes d'une zone, filtré ou non, le nombre de familles différentes sur le triangle, une valeur de partie, les tours en main de la bille, les mêmes nombres que les montants calculés (plus bas). « si vous avez au plus 3 billes en main », « si le pot compte au moins 3 abeilles », « si cette partie compte au moins 2 éveils » ;
 - **la Vitesse ou la Masse du tour**, comparée à une borne, telle qu'elle est quand l'effet joue, avant ce qu'il produit : « si la Vitesse est d'au moins 10 », « si la Masse est d'au plus 1 » ;
+- **la bille visée**, dans un Polissage ou une Fêlure seulement, qui réagissent pour toute bille active : c'est cette bille qui est visée, ou une autre : « Polissage : Vitesse +3 si c'est cette bille qui est visée » ;
 - **l'état d'une zone de la partie** : le triangle est plein, vide, ou n'a qu'une bille ; la main est vide, ou pleine ; le sac est vide ; la défausse est vide ; le pot est plein, ou vide. « Pleine » et « plein » se comparent aux caractéristiques en vigueur : la taille de la main, la capacité du pot. Une bille en transit (en cours de lancer, en partance) n'est dans aucune zone et ne compte nulle part : pendant sa Chiquenaude, la bille lancée n'est plus en main ; pendant son Éjection, la bille chassée n'est plus sur le triangle. « Pointe : Vitesse +6 si le triangle est plein. », « Tic : Pioche 1 si la main est vide. », « En poche, à chaque résolution : Masse +2 si le pot est plein. ».
 
 Les conditions sur la bille d'un emplacement (son calibre, sa famille, sa rareté, une bille précise) et le calibre d'une bille d'un remplacement peuvent se **nier** : « si la bille de l'emplacement suivant n'est pas de la famille Bestiaire ». Un emplacement vide n'a ni calibre, ni famille, ni rareté : la condition niée y est vraie.
@@ -382,8 +385,8 @@ Une action dont la cible est vide ne fait rien, et le journal le dit : un emplac
 
 - Une bille n'entre au pot que par un effet Empocher, jamais par un geste du joueur.
 - Le pot garde ses billes dans l'ordre d'arrivée, au plus sa capacité en vigueur : 3 au départ, qu'un statut peut changer (section 12).
-- **Pot plein** : la bille envoyée est perdue pour la partie. Elle n'a pas d'effet d'entrée, ni aucun autre.
-- Une bille au pot n'en sort jamais, et ne revient jamais au sac.
+- **Le débordement** : une bille qui arrive dans un pot plein y entre quand même, et le pot déborde. Sa bille la plus ancienne en sort et se perd, sa Perte joue, puis l'effet d'entrée de la nouvelle. Le pot n'est donc jamais au-delà de sa capacité quand quelque chose le lit. Si un statut a réduit la capacité, il déborde d'autant : les plus anciennes, une par une. Un pot de capacité 0 perd aussitôt la bille qui arrive, sans entrée.
+- Une bille ne sort du pot que par un débordement, et ne revient jamais au sac.
 - Ses effets En poche jouent : à son entrée, à chaque résolution, et en réaction.
 - Une bille empochée pendant la résolution, avant l'étape du pot, y joue son effet à chaque résolution dès ce tour.
 - Ses gains de Vitesse et de Masse comptent pour le tour en cours.
@@ -395,7 +398,7 @@ Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche
 - Elle peut écouter un évènement de la partie, le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action : les valeurs de partie de ces trois catégories (section 10, « Les catégories »).
 - Elle écoute aussi une quantité qui compte des billes, une réaction par bille, pour réagir à chaque bille plutôt qu'à chaque action : « à chaque bille renvoyée par effet », « à chaque bille éjectée par effet », « à chaque bille piochée par effet ». Elle n'écoute jamais une quantité de points (l'usure retirée ou ajoutée), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
-- **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour un effet Piocher, pour un retrait à l'étape des retraits comme pour un retrait par un effet Fêler. Une bille perdue au pot plein suit cet ordre comme toute arrivée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
+- **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour un effet Piocher, pour un retrait à l'étape des retraits comme pour un retrait par un effet Fêler. Une bille perdue par un débordement suit cet ordre comme toute autre : sa Perte, puis les réactions à sa perte, avant l'entrée de la bille qui l'a poussée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
 - **Une seule exception, les phases de la résolution** : ce qu'elles font réagir (une phase de base, un effet Polir, une pioche…) attend la fin de la phase de pointe. À l'étape du pot, chaque bille joue ses réactions retenues, puis son effet à chaque résolution, avant la bille suivante ; puis les statuts jouent les leurs. Une abeille au pot ne se fait donc entendre qu'après la pointe, deux fois si les deux bases ont joué.
 - Une bille qui entre au pot ne réagit pas à sa propre mise en poche ; elle réagit aux occurrences suivantes. Une bille entrée plus tard ne réagit pas à ce qui l'a précédée.
 - Un bonus de réaction dont la phase est passée est perdu : c'est toujours le cas d'une réaction retenue pendant les phases.
@@ -420,7 +423,7 @@ Les valeurs de partie sont des compteurs tenus pendant la partie. Les montants c
 - **Les déclenchements de mots-clés** : chacun se dit par son mot-clé, « Éjections déclenchées », « à chaque Éjection déclenchée » : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, Polissage, Fêlure ; les phases de pointe, de base, de base droite, de base gauche ; et les effets En poche (entrée, résolution, réactions).
 - **Les actions** : pour chaque mot-clé d'action, ses effets, « effets Éjecter », « à chaque effet Éjecter », et sa quantité réelle, « billes éjectées par effet » (billes piochées, usure retirée ou ajoutée, billes empochées, éjectées, défaussées, renvoyées, ramassées).
 - **Vitesse et Masse** : les gains et les pertes, en nombre et en total.
-- **Les évènements** : ce qui arrive aux billes, au participe, et à la partie, par un nom : billes lancées, remplacements (une pose sur un emplacement occupé), billes éjectées, billes normales et calots éjectés, mélanges, billes piochées, usées, sorties du triangle, empochées, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
+- **Les évènements** : ce qui arrive aux billes, au participe, et à la partie, par un nom : billes lancées, remplacements (une pose sur un emplacement occupé), billes éjectées, billes normales et calots éjectés, mélanges, billes piochées, usées, sorties du triangle, empochées, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne), et les débordements du pot ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
 
 ### Les règles de comptage
 
@@ -437,7 +440,7 @@ La prévision dit ce que le tour produirait, sans rien changer à la partie. Ell
 - **la vue d'ensemble**, touche R : la Vitesse, la Masse et l'Impact prévus, puis ce que chaque emplacement et chaque bille du pot produiraient ;
 - **la confirmation d'une pose** : ce que la bille posée produirait, sa Chiquenaude, le Tic et l'Éjection éventuels, et les réactions du pot.
 
-Elle joue les vraies règles sur une copie de la partie, sans jamais révéler l'ordre du sac : une bille qui serait piochée y reste inconnue. Elle montre aussi les mélanges du sac et leurs Trouvailles, les Finals, les billes qui seraient chassées ou empochées, les cibles vides, et les billes retirées avant leur phase.
+Elle joue les vraies règles sur une copie de la partie, sans jamais révéler l'ordre du sac : une bille qui serait piochée y reste inconnue. Elle montre aussi les mélanges du sac et leurs Trouvailles, les Finals, les billes qui seraient chassées ou empochées, les débordements du pot et leurs Pertes (« le pot déborde : cuivre perdu, Perte : Vitesse +2 »), les cibles vides, et les billes retirées avant leur phase.
 
 Elle a deux exceptions :
 
@@ -474,7 +477,7 @@ Un **statut** est un effet durable que reçoit la partie, donné par une bille (
   - **l'échange** : il est refusé, « Échange interdit par le statut : … » ;
   - **le remplacement** : une pose sur un emplacement occupé est refusée ; une pose sur un emplacement vide reste permise ;
   - **un mot-clé de déclenchement** (la Chiquenaude, par exemple) : il ne se déclenche plus. L'évènement a lieu (la bille est bien lancée, et compte parmi les billes lancées), mais son effet ne joue pas, et son compteur de déclenchements ne bouge pas : rien n'y réagit ;
-  - **le pot** : les billes du pot n'agissent plus, ni à leur entrée, ni à la résolution, ni en réaction. Elles y entrent toujours, et la capacité ne change pas.
+  - **le pot** : les billes du pot n'agissent plus, ni à leur entrée, ni à la résolution, ni en réaction, ni par leur Perte quand un débordement les pousse dehors. Elles y entrent toujours, le pot déborde toujours, et la capacité ne change pas.
   Une action verrouillée n'est jamais proposée ; la prévision tient compte des verrous. Un verrou ne vise aujourd'hui que la partie ; un verrou sur une bille (« cette bille ne peut pas être éjectée ») est prévu, pas encore joué.
 
 ### Les points d'interception
@@ -700,7 +703,7 @@ cuivre, normale, Trésor, commune, usure 4.
 - Pointe : Vitesse +3.
 - Base : Vitesse égale à la Vitesse que donne la bille de l'autre base.
 - Éjection : Vitesse +3.
-- Polissage : Vitesse +3.
+- Polissage : Vitesse +3 si c'est cette bille qui est visée.
 - En poche, à chaque résolution : Vitesse +2.
 
 ### vive-argent

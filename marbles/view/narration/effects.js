@@ -316,12 +316,12 @@ export function combined(parts, t) {
 
 // Ce qu'un Empocher PRÉVU a déplacé (marbles/core/forecast.js, `pockets`), dit chez la
 // bille qui l'a produit : « porcelaine en poche, à l'entrée : Vitesse +10 », « argile
-// en poche », « pot plein : argile perdue » ; une bille piochée à l'aveugle reste
-// inconnue.
-function pocketPart({ marble, lost, entry }, t) {
+// en poche », « le pot déborde : argile perdue », sa Perte comprise (« …, Perte :
+// Vitesse +2 ») ; une bille piochée à l'aveugle reste inconnue.
+function pocketPart({ marble, lost, entry, loss = null }, t) {
   if (marble === null) return t(lost ? "marbles.pocket.lost_unknown" : "marbles.pocket.entered_unknown");
   const ref = marbleRef(marble);
-  if (lost) return t("marbles.pocket.lost", { marble: ref });
+  if (lost) return loss === null ? t("marbles.pocket.lost", { marble: ref }) : t("marbles.pocket.lost_effect", { marble: ref, effect: describeEffect(loss, t) });
   if (entry === null) return t("marbles.pocket.entered", { marble: ref });
   return t("marbles.pocket.entered_effect", { marble: ref, effect: describeEffect(entry, t) });
 }
@@ -465,6 +465,7 @@ const CONDITION_TEXTS = {
     return t("marbles.condition.printedStat", { slot: slotName(when.slot, t), effect });
   },
   relativeSize: (when, t) => t("marbles.condition.relativeSize", { marble: when.marble, is: when.is }),
+  concerned: (when, t) => t(`marbles.condition.concerned.${when.is}`),
   sizeAt: (when, t) => slotConditionText("marbles.condition.sizeAt", when, { size: sizeRef(when.size), not: negation(when) }, t),
   // L'état d'une zone : un texte par zone et par état déclaré.
   zone: (when, t) => t(`marbles.condition.zone.${when.zone}.${when.state}`),

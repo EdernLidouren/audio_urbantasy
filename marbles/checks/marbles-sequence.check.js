@@ -730,22 +730,22 @@ function checkTexts(run) {
       recordSteps({ ...EMPTY_HISTORY, current: [], currentTurn: 2 }, placeSteps).current.includes("outcome.pot{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, speed: 2, mass: 1}")
     );
 
-    // Le pot plein : la perte se dit, sans entrée.
+    // Le pot plein : il déborde, la perte de la plus ancienne se dit, avant l'entrée.
     const lostState = { ...pocketing, pot: ["aging_flick", "hit_polish", "awaken_draw"] };
     run.same(
-      "Empocher, pot plein : la perte",
+      "Empocher, pot plein : le débordement, la plus ancienne perdue",
       [
         "resolution.opening{turn: 2} outcome.empty{slot: slot.rightBase}",
         "outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
-        "event.lost{marble: <fragile>}",
+        "event.lost{marble: <aging_flick>}",
       ],
       texts(lostState).slice(0, 3)
     );
     run(
-      "Empocher, pot plein, R : la perte chez base_pocket",
+      "Empocher, pot plein, R : le débordement chez base_pocket, puis l'entrée",
       true,
       describeOverview(lostState, rules, t).includes(
-        "outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: pocket.then{effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}, pockets: effect.combined{parts: [pocket.lost{marble: <fragile>}]}}}"
+        "outcome.slot{slot: slot.leftBase, marble: <base_pocket>, effect: pocket.then{effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}, pockets: effect.combined{parts: [pocket.lost{marble: <aging_flick>} | pocket.entered"
       )
     );
     // Une cible vide se prévoit, chez l'effet qui la vise, avant ce qu'il empoche :

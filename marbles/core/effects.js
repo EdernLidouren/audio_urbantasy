@@ -255,6 +255,14 @@ function validatePositive(clause, describe, fail, context) {
   validateAmount(clause, describe, fail, context, 1);
 }
 
+// L'ARRIVÉE AU POT de la bille qu'un Empocher déplace : elle y entre (`pocketed`),
+// ou, pot de capacité 0, s'y perd aussitôt (`lost` depuis sa zone). La plus ancienne
+// qu'un débordement pousse dehors (`lost` depuis le pot) n'en est pas une
+// (marbles/core/path.js/sendToPot).
+function arrivesAtPot(event) {
+  return event.type === "pocketed" || (event.type === "lost" && event.from !== "pot");
+}
+
 // Une ARRIVÉE (en main, ou à la défausse) d'une bille que l'action `action` a
 // déplacée, directement ou par une redirection (`movedBy`, marbles/core/path.js/
 // arrive).
@@ -500,12 +508,12 @@ export const CLAUSE_ACTIONS = {
       // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
       marbleQuantity: true,
       triggers: (event) =>
-        ((event.type === "pocketed" || event.type === "lost") && event.redirected !== true) ||
+        (arrivesAtPot(event) && event.redirected !== true) ||
         (event.type === "redirected" && event.action === "pocket") ||
         (event.type === "targetEmpty" && event.action === "pocket")
           ? 1
           : 0,
-      quantity: (event) => (event.type === "pocketed" || event.type === "lost" ? 1 : 0),
+      quantity: (event) => (arrivesAtPot(event) ? 1 : 0),
     },
   },
   // Éjecter : CHASSE une bille active du triangle par un effet, sans pose, sans
@@ -904,6 +912,23 @@ export const CONDITIONS = {
     test(when, { triangle }) {
       if (!SLOTS.includes(when.slot)) return false;
       return SLOT_STATES[when.state](triangle[when.slot] ?? null);
+    },
+  },
+  // LA BILLE CONCERNÉE par l'évènement d'un déclencheur qui réagit pour toute bille
+  // active (portée "any" : le Polissage, la Fêlure) : est-ce la bille qui joue l'effet
+  // (`is` "self"), ou une autre ("other") ? « Polissage : Vitesse +3 si c'est cette
+  // bille qui est visée ». Par défaut, ces déclencheurs réagissent pour toute bille
+  // active ; une bille qui ne réagit qu'à elle-même le PRÉCISE ainsi. Refusée ailleurs
+  // au chargement : un autre déclencheur ne concerne jamais que sa propre bille.
+  concerned: {
+    fields: ["type", "is"],
+    validate(when, describe, fail, context) {
+      if (!["self", "other"].includes(when.is)) fail(`${describe} : bille concernée inconnue "${when.is}" (self, other).`);
+      if (context.scope !== "any") fail(`${describe} : « concerned » ne vaut que dans un déclencheur qui réagit pour toute bille active (Polissage, Fêlure).`);
+    },
+    test(when, { holder, concerned }) {
+      if (concerned === null || concerned === undefined || holder?.slot === null || holder?.slot === undefined) return false;
+      return (holder.slot === concerned) === (when.is === "self");
     },
   },
   // Pendant un remplacement : la bille `marble` ("ejected", l'éjectée, ou "placed",

@@ -104,11 +104,13 @@ export const HOLDER_ZONES = {
   thrown: { zone: "thrown", where: "elle est en cours de lancer (sa Chiquenaude)" },
   leaving: { zone: "leaving", where: "elle est en partance (son Final, son Éjection)" },
   dropped: { zone: "discard", where: "elle vient d'arriver à la défausse (sa Chute)" },
+  lost: { zone: "lost", where: "elle vient d'être perdue, sortie de la partie (sa Perte)" },
   pot: { zone: "pot", where: "elle est dans le pot" },
   // Un STATUT qui réagit (marbles/core/statuses.js) : aucune bille ne joue l'effet.
   status: { zone: "status", where: "c'est un statut, sans bille" },
 };
 
 // Les zones de la bille qui joue un effet où elle n'a JAMAIS d'emplacement de
-// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot, et un statut.
-export const NO_REFERENCE_ZONES = ["hand", "pot", "status"];
+// référence (HOLDER_ZONES) : en main (l'Éveil), dans le pot, perdue (la Perte), et un
+// statut.
+export const NO_REFERENCE_ZONES = ["hand", "pot", "lost", "status"];

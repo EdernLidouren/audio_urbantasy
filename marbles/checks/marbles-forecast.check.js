@@ -230,13 +230,20 @@ function checkPocketForecast(run) {
   const predicted = rules.forecast(hitPocket, toApex);
   run.same(
     "pot prévu : chez le Tic de hit_pocket, fragile et son entrée",
-    [{ marble: "fragile", lost: false, entry: { marble: "fragile", speed: 10, mass: 0, draw: 0, operations: [], given: [] } }],
+    [{ marble: "fragile", lost: false, entry: { marble: "fragile", speed: 10, mass: 0, draw: 0, operations: [], given: [] }, loss: null }],
     predicted.hit.pockets
   );
   run("pot prévu : l'entrée dans la Vitesse prévue (Tic 4, entrée 10, pointe de hit_pocket 6)", 20, predicted.speed);
   run("pot prévu : égal au réel", true, matches(hitPocket, toApex));
   const full = { ...hitPocket, pot: ["aging_flick", "hit_polish", "awaken_draw"] };
-  run.same("pot prévu, plein : fragile perdue, sans entrée", [{ marble: "fragile", lost: true, entry: null }], rules.forecast(full, toApex).hit.pockets);
+  run.same(
+    "pot prévu, plein : le débordement, aging_flick perdue, puis fragile et son entrée",
+    [
+      { marble: "aging_flick", lost: true, entry: null, loss: null },
+      { marble: "fragile", lost: false, entry: { marble: "fragile", speed: 10, mass: 0, draw: 0, operations: [], given: [] }, loss: null },
+    ],
+    rules.forecast(full, toApex).hit.pockets
+  );
   run("pot prévu, plein : égal au réel", true, matches(full, toApex));
 
   // base_pocket empoche la pointe pendant la résolution : phase sautée, entrée comptée.
@@ -277,7 +284,7 @@ function checkPocketForecast(run) {
   const drawPocket = fabricatedRules({ drawPocket: { hit: [{ action: "draw", amount: 1 }, { action: "pocket", target: "firstInHand" }] }, plain: {} });
   const blind = marblesPlayState(drawPocket, { hand: inHand(["drawPocket"]), bag: ["plain"], triangle: { leftBase: null, rightBase: null, apex: placed("plain") } });
   const unknown = drawPocket.forecast(blind, toApex);
-  run.same("pot prévu, bille inconnue : empochée sans être nommée", [{ marble: null, lost: false, entry: null }], unknown.hit.pockets);
+  run.same("pot prévu, bille inconnue : empochée sans être nommée", [{ marble: null, lost: false, entry: null, loss: null }], unknown.hit.pockets);
   run("pot prévu, bille inconnue : incertaine", true, unknown.uncertain);
   run("pot prévu, bille inconnue : aucun Éveil possible", false, unknown.awakenPossible);
   const frozen = deepFreeze(structuredClone(hitPocket));

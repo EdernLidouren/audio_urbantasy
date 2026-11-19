@@ -27,7 +27,10 @@ const COUNTER_ACTIONS = Object.fromEntries(TALLY_COUNTERS.filter((counter) => co
 const FIELD_CONTEXTS = {
   ...Object.fromEntries(MARBLE_PHASES.map((phase) => [phase.field, { phaseSlots: phase.slots }])),
   ...Object.fromEntries(
-    MARBLE_TRIGGERS.map((trigger) => [trigger.field, { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true, trigger: trigger.id }])
+    MARBLE_TRIGGERS.map((trigger) => [
+      trigger.field,
+      { moment: trigger.moment, marble: trigger.marble, replacement: trigger.replacement === true, trigger: trigger.id, scope: trigger.scope ?? "self" },
+    ])
   ),
 };
 

@@ -348,7 +348,8 @@ export const MARBLE_PHASES = [
 //             l'évènement ; "leaving", celle que l'évènement nomme, EN PARTANCE :
 //             sortie de sa zone, pas encore arrivée (marbles/core/path.js/travel) ;
 //             "dropped", celle que l'évènement nomme, qui vient d'arriver à la
-//             DÉFAUSSE ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
+//             DÉFAUSSE ; "lost", celle que l'évènement nomme, qui vient d'être
+//             PERDUE (sortie de la partie, sans emplacement) ; "thrown", celle que l'évènement nomme, EN COURS DE LANCER :
 //             sortie de la main, pas encore sur le triangle ; "drawn", celle que
 //             l'évènement nomme, qui vient d'être piochée : en main, à 0 tour en
 //             main (seules Empocher et Défausser y prennent la bille elle-même) ;
@@ -363,6 +364,9 @@ export const MARBLE_PHASES = [
 //   scope     (facultatif, "onSlot" seulement) qui réagit : "self" (par défaut), la
 //             bille de l'emplacement de l'évènement ; "any", toute bille active qui
 //             a le champ, elle comprise ;
+//   potLock   (facultatif, true) une bille qui quitte le POT (`from` "pot") se tait
+//             quand le pot est verrouillé (marbles/core/statuses.js/LOCKS, « pot
+//             inerte »), comme les autres effets du pot ;
 //   atLeast   (facultatif) ce que l'évènement doit porter pour le déclencher, des
 //             champs numériques et leur minimum : { applied: 1 }, une usure
 //             vraiment changée ;
@@ -376,6 +380,8 @@ export const MARBLE_PHASES = [
 //               de phase (R, valeurs de la confirmation) ;
 //               { line: "regeneration" } : juste après l'annonce de la régénération
 //               du sac (R, confirmation), une phrase par effet, qui nomme sa bille ;
+//               { line: "pocket" } : avec la mise en poche qui le provoque, chez
+//               l'effet qui empoche (la Perte d'un débordement) ;
 //               { line: "none" } : jamais prévu, la bille concernée étant inconnue
 //               de la prévision (l'Éveil : marbles/core/forecast.js, « incertain ») ;
 //   texts     ses gabarits i18n : `name`, le nom du mot-clé (« Chiquenaude ») ;
@@ -526,16 +532,18 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
-  // Le Polissage reçu : la bille ACTIVE elle-même vient d'être polie d'au moins 1
-  // (l'usure vraiment rendue : polir une bille à 0 ne déclenche rien), par un effet,
-  // à tout moment. Il porte le nom de l'action Polissage, qu'il ne faut pas confondre :
-  // ses textes disent le déclencheur.
+  // Le Polissage : une bille ACTIVE, n'importe laquelle, elle comprise, vient d'être
+  // polie d'au moins 1 (l'usure vraiment retirée : polir une bille à 0 ne déclenche
+  // rien), par un effet Polir, à tout moment ; chaque bille active qui a ce champ
+  // réagit, en miroir de la Fêlure. Une bille qui ne veut réagir qu'à son propre
+  // polissage le dit par la condition « concerned » (marbles/core/effects.js).
   {
     id: "polished",
     field: "polished",
     event: "polished",
     marble: "onSlot",
     moment: "anytime",
+    scope: "any",
     atLeast: { applied: 1 },
     forecast: { line: "slot" },
     texts: {
@@ -547,9 +555,10 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
-  // La Fêlure reçue : une bille ACTIVE, n'importe laquelle, elle comprise, vient
-  // d'être fêlée d'au moins 1 ; chaque bille active qui a ce champ réagit, encore sur
-  // le triangle (fêlée jusqu'à son maximum, elle est déjà partie et ne réagit plus).
+  // La Fêlure : une bille ACTIVE, n'importe laquelle, elle comprise, vient d'être
+  // fêlée d'au moins 1 ; chaque bille active qui a ce champ réagit, encore sur le
+  // triangle (fêlée jusqu'à son maximum, elle est déjà partie et ne réagit plus). Le
+  // miroir du Polissage, condition « concerned » comprise.
   {
     id: "cracked",
     field: "cracked",
@@ -565,6 +574,28 @@ export const MARBLE_TRIGGERS = [
       card: "marbles.card.cracked",
       effect: "marbles.event.effect_cracked",
       slot: "marbles.outcome.cracked",
+    },
+    card: "below",
+  },
+  // La Perte : la bille vient d'être PERDUE, sortie de la partie : aujourd'hui, la
+  // plus ancienne du pot qu'un débordement pousse dehors (ou celle qui arrive dans un
+  // pot de capacité 0), marbles/core/path.js/sendToPot. Elle est parmi les billes
+  // perdues, sans emplacement ; ses effets jouent comme un Final. Sortie du pot, le
+  // verrou du pot la fait taire (`potLock`). Sa prévision : avec la mise en poche qui
+  // l'a poussée dehors (`pocket`, marbles/core/forecast.js).
+  {
+    id: "loss",
+    field: "loss",
+    event: "lost",
+    marble: "lost",
+    moment: "anytime",
+    potLock: true,
+    forecast: { line: "pocket" },
+    texts: {
+      name: "marbles.keyword.loss.name",
+      description: "marbles.keyword.loss.description",
+      card: "marbles.card.loss",
+      effect: "marbles.event.effect_loss",
     },
     card: "below",
   },
@@ -615,8 +646,11 @@ export const MARBLE_TALLIES = [
   { id: "triangleExits", events: ["removed"] },
   // Chaque bille entrée au pot.
   { id: "pocketedMarbles", events: ["pocketed"] },
-  // Chaque bille perdue, envoyée au pot plein.
+  // Chaque bille perdue, sortie de la partie : poussée hors du pot par un débordement.
   { id: "lostMarbles", events: ["lost"] },
+  // Chaque débordement du pot : une bille poussée dehors par une arrivée au pot plein
+  // (une par bille perdue ainsi).
+  { id: "overflows", events: ["lost"], match: { cause: "overflow" } },
   // Chaque bille arrivée à la défausse, d'où qu'elle vienne (triangle, main, sac).
   { id: "discardedMarbles", events: ["discarded"] },
   // LES STATUTS (marbles/core/statuses.js) : chaque statut reçu (une instance neuve),

@@ -1,7 +1,7 @@
 // Vérifications du core — domaine « marbles-reactions ». Ce qui RÉAGIT sur le triangle
 // et ce que le pot peut écouter bille par bille, dans le jeu des billes : les
-// déclencheurs Polissage reçu (la bille elle-même, polie d'au moins 1) et Fêlure reçue
-// (toute bille active fêlée d'au moins 1, elle comprise), leurs compteurs, leurs
+// déclencheurs Polissage et Fêlure (toute bille active polie ou fêlée d'au moins 1,
+// elle comprise ; la condition « concerned » pour la bille elle-même), leurs compteurs, leurs
 // textes et la prévision ; les compteurs d'évènements par bille (billes renvoyées par
 // un Rebond, éjectées par un effet, normales ou calots éjectés) et une réaction du pot
 // qui les écoute ; un statut de lancer pour ce tour donné par une Chiquenaude
@@ -11,15 +11,16 @@
 
 import { throws } from "../../lib/check.js";
 import { MARBLE_TRIGGERS, SMALL } from "../config/values.js";
-import { NEXT_SLOT, allActive, applyStatus, bounce, crack, eject, mass, polish, speed } from "../content/effects.js";
+import { FIRST_IN_HAND, NEXT_SLOT, allActive, applyStatus, bounce, concerned, crack, eject, mass, pocket, polish, speed } from "../content/effects.js";
 import { validateMarbleTriggers } from "../core/content.js";
 import { throwsLeft } from "../core/marbles.js";
 import { marbleCard } from "../view/card.js";
-import { fabricatedRules, forecastMatches, inHand, keyText as t, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
+import { fabricatedRules, forecastMatches, inHand, keyText as t, marbleCount, marblesPlayState, mustReduce, placed, statusInstance, validateTable } from "./helpers.js";
 
 export default function checkMarblesReactions(run) {
-  run.section("Polissage reçu", checkPolished);
+  run.section("Polissage", checkPolished);
   run.section("Fêlure reçue", checkCracked);
+  run.section("débordement et Perte", checkOverflowLoss);
   run.section("déclaration des déclencheurs", checkDeclaration);
   run.section("compteurs par bille", checkMarbleTallies);
   run.section("lancer rendu", checkThrowBack);
@@ -28,25 +29,46 @@ export default function checkMarblesReactions(run) {
 // Les effets joués pour le déclencheur `trigger`, { marble, slot, speedDelta }.
 const playedFor = (events, trigger) => events.filter((event) => event.type === "effect" && event.trigger === trigger).map(({ marble, slot, speedDelta }) => ({ marble, slot, speedDelta }));
 
-// LE POLISSAGE REÇU : la bille elle-même, polie d'au moins 1 ; une autre bille polie,
-// ou un polissage qui ne rend rien, ne la déclenche pas.
+// LE POLISSAGE : en miroir de la Fêlure, toute bille active polie d'au moins 1, elle
+// comprise ; chaque bille active qui a le champ réagit ; un polissage qui ne retire
+// rien ne déclenche rien. La condition « concerned » restreint à la bille elle-même
+// (« si c'est cette bille qui est visée »), ou aux autres ; refusée ailleurs.
 function checkPolished(run) {
   const table = {
     plain: {},
-    // Polissage : Vitesse +3.
-    copper: { polished: [speed(3)] },
-    // Base : Polissage 1 à la bille de l'emplacement suivant.
+    // Polissage : Vitesse +3, pour toute bille active polie.
+    shiny: { polished: [speed(3)] },
+    // Polissage : Vitesse +3 si c'est cette bille qui est visée (le cuivre).
+    copper: { polished: [{ ...speed(3), when: concerned("self") }] },
+    // Polissage : Vitesse +1 si c'est une autre bille qui est visée.
+    jealous: { polished: [{ ...speed(1), when: concerned("other") }] },
+    // Base : Polir de 1 la bille de l'emplacement suivant.
     polisher: { base: [polish(1, NEXT_SLOT)] },
   };
   const rules = fabricatedRules(table);
-  const resolve = (apex, wear) => mustReduce(rules, marblesPlayState(rules, { triangle: { rightBase: null, leftBase: placed("polisher"), apex: placed(apex, wear) } }), { type: "resolve" });
-  run.same("Polissage reçu : polie de 1, Vitesse +3", [{ marble: "copper", slot: "apex", speedDelta: 3 }], playedFor(resolve("copper", 1).events, "polished"));
-  run.same("Polissage reçu : à usure 0, rien de rendu, rien", [], playedFor(resolve("copper", 0).events, "polished"));
-  const other = mustReduce(rules, marblesPlayState(rules, { triangle: { rightBase: placed("polisher"), leftBase: placed("plain", 1), apex: placed("copper", 1) } }), { type: "resolve" });
-  run.same("Polissage reçu : une autre bille polie ne la déclenche pas", [], playedFor(other.events, "polished").filter((effect) => effect.slot !== "apex"));
-  run.same("Polissage reçu : compté une fois", [1, 0], [resolve("copper", 1).state.tally.polished.game, resolve("copper", 0).state.tally.polished.game]);
-  run("Polissage reçu : prévision égale au réel", true, forecastMatches(rules, marblesPlayState(rules, { triangle: { rightBase: null, leftBase: placed("polisher"), apex: placed("copper", 1) } }), null));
-  run("fiche : « Polissage : Vitesse +3. »", "card.polished{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 3}]}]}}", marbleCard("copper", "x", rules, t, { timeless: true }).below[0]);
+  const resolve = (triangle) => mustReduce(rules, marblesPlayState(rules, { triangle }), { type: "resolve" });
+  const played = (triangle) => playedFor(resolve(triangle).events, "polished").map((effect) => `${effect.marble}:${effect.slot}:${effect.speedDelta}`);
+  // La base gauche polit la pointe (usure 1) : seule bille polie.
+  run.same("Polissage : elle-même polie, elle réagit", ["shiny:apex:3"], played({ rightBase: null, leftBase: placed("polisher"), apex: placed("shiny", 1) }));
+  run.same("Polissage : à usure 0, rien de retiré, rien", [], played({ rightBase: null, leftBase: placed("polisher"), apex: placed("shiny", 0) }));
+  // La base droite polit la base gauche : la pointe, une autre bille, réagit aussi.
+  run.same("Polissage : une autre bille polie, elle réagit", ["shiny:apex:3"], played({ rightBase: placed("polisher"), leftBase: placed("plain", 1), apex: placed("shiny") }));
+  // La base droite polit la base gauche : les deux cuivres réagissent, seul celui qui
+  // est visé produit sa Vitesse ; l'inverse pour la condition « une autre ».
+  const gained = (triangle) => played(triangle).filter((line) => !line.endsWith(":0"));
+  run.same("Polissage : cette bille seulement, précisée par la condition", ["copper:leftBase:3"], gained({ rightBase: placed("polisher"), leftBase: placed("copper", 1), apex: placed("copper") }));
+  run.same("Polissage : une autre bille seulement", ["jealous:apex:1"], gained({ rightBase: placed("polisher"), leftBase: placed("jealous", 1), apex: placed("jealous") }));
+  run("Polissage : compté par bille qui a le champ, condition fausse comprise", 2, resolve({ rightBase: placed("polisher"), leftBase: placed("copper", 1), apex: placed("copper") }).state.tally.polished.game);
+  run("Polissage : prévision égale au réel", true, forecastMatches(rules, marblesPlayState(rules, { triangle: { rightBase: placed("polisher"), leftBase: placed("copper", 1), apex: placed("shiny") } }), null));
+  run(
+    "fiche : « Polissage : Vitesse +3 si c'est cette bille qui est visée. »",
+    "card.polished{effect: effect.combined{parts: [effect.conditional{effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, condition: condition.concerned.self}]}}",
+    marbleCard("copper", "x", rules, t, { timeless: true }).below[0]
+  );
+  // La condition hors d'un déclencheur pour toute bille active : refusée au chargement.
+  run("condition « concerned » : refusée hors du Polissage et de la Fêlure", true, throws(() => validateTable({ wrong: { base: [{ ...speed(1), when: concerned("self") }] } })));
+  run("condition « concerned » : bille inconnue refusée", true, throws(() => validateTable({ wrong: { polished: [{ ...speed(1), when: concerned("everyone") }] } })));
+  run("condition « concerned » : acceptée dans la Fêlure", false, throws(() => validateTable({ fine: { cracked: [{ ...speed(1), when: concerned("other") }] } })));
 }
 
 // LA FÊLURE REÇUE : toute bille active fêlée d'au moins 1, elle comprise ; chaque bille
@@ -79,6 +101,69 @@ function checkCracked(run) {
   run("Fêlure reçue : comptée par bille qui a le champ (deux fêlures, deux diables)", 4, resolve({ rightBase: placed("cracker"), leftBase: placed("devil"), apex: placed("devil") }).state.tally.cracked.game);
   run("Fêlure reçue : prévision égale au réel", true, forecastMatches(rules, marblesPlayState(rules, { triangle: { rightBase: placed("cracker"), leftBase: placed("plain"), apex: placed("devil") } }), null));
   run.same("mots-clés : la Fêlure reçue et l'action Fêlure, deux entrées", ["cracked", "crack"], rules.keywordsOf("devil").map((keyword) => keyword.id).filter((id) => id.startsWith("crack")));
+}
+
+// LE DÉBORDEMENT ET LA PERTE (marbles/core/path.js/sendToPot) : une bille qui arrive
+// dans un pot plein y entre, la plus ancienne en sort et se perd, sa Perte joue, puis
+// l'entrée de la nouvelle ; le verrou du pot fait taire la Perte d'une bille poussée
+// hors du pot ; un pot de capacité 0 perd la nouvelle elle-même, depuis sa zone, sa
+// Perte comprise. La Perte n'a ni emplacement de référence ni d'action sur elle-même.
+function checkOverflowLoss(run) {
+  const table = {
+    plain: {},
+    // Chiquenaude : Empocher la première bille de la main.
+    pocketer: { flick: [pocket(FIRST_IN_HAND)] },
+    // Perte : Vitesse +5.
+    mourner: { loss: [speed(5)] },
+    // En poche, à l'entrée : Vitesse +10.
+    greeter: { pocketed: { entry: [speed(10)] } },
+  };
+  const rules = fabricatedRules(table);
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+  const fullPot = (over = {}) => marblesPlayState(rules, { hand: inHand(["pocketer", "greeter"]), pot: ["mourner", "plain", "plain"], ...over });
+  const steps = (events) =>
+    events
+      .filter((event) => ["lost", "pocketed"].includes(event.type) || (event.type === "effect" && ["loss", "pocketEntry"].includes(event.trigger)))
+      .map((event) => (event.type === "effect" ? `${event.trigger}:${event.marble}` : `${event.type}:${event.marble}:${event.from}`));
+  const overflow = mustReduce(rules, fullPot(), toApex);
+  run.same(
+    "débordement : la plus ancienne perdue depuis le pot, sa Perte, puis la nouvelle entre, son entrée",
+    ["lost:mourner:pot", "loss:mourner", "pocketed:greeter:hand", "pocketEntry:greeter"],
+    steps(overflow.events)
+  );
+  run.same("débordement : le pot reste à sa capacité, la plus ancienne chez les perdues", { pot: ["plain", "plain", "greeter"], lost: ["mourner"] }, { pot: overflow.state.pot, lost: overflow.state.lost });
+  run("débordement : Perte (+5) et entrée (+10) comptées", 15, overflow.state.speed);
+  run.same(
+    "débordement : les valeurs de partie, un Empocher et une seule bille déplacée",
+    { overflows: 1, lostMarbles: 1, loss: 1, pocket: 1, pocketQuantity: 1, pocketedMarbles: 1 },
+    Object.fromEntries(["overflows", "lostMarbles", "loss", "pocket", "pocketQuantity", "pocketedMarbles"].map((id) => [id, overflow.state.tally[id].game]))
+  );
+  run("débordement : aucune bille perdue ni dupliquée", marbleCount(fullPot()), marbleCount(overflow.state));
+  run("débordement : prévision égale au réel", true, forecastMatches(rules, fullPot(), toApex));
+  run.same(
+    "débordement : la prévision dit la perte et sa Perte chez l'effet qui empoche",
+    [
+      { marble: "mourner", lost: true, loss: 5 },
+      { marble: "greeter", lost: false, loss: null },
+    ],
+    rules.forecast(fullPot(), toApex).flick.pockets.map(({ marble, lost, loss }) => ({ marble, lost, loss: loss === null ? null : loss.speed }))
+  );
+
+  // Le pot verrouillé (pot inerte) : le débordement a lieu, la Perte se tait, comme
+  // l'entrée.
+  const locked = mustReduce(rules, { ...fullPot(), statuses: [statusInstance("no_pot", { remaining: null })] }, toApex);
+  run.same("pot verrouillé : le débordement a lieu, sans Perte ni entrée", [["lost:mourner:pot", "pocketed:greeter:hand"], 0], [steps(locked.events), locked.state.speed]);
+  run("pot verrouillé : la Perte ne compte pas", 0, locked.state.tally.loss.game);
+
+  // Un pot de capacité 0 : la nouvelle se perd elle-même, depuis la main, sa Perte comprise.
+  const zero = mustReduce(rules, marblesPlayState(rules, { hand: inHand(["pocketer", "mourner"]), potCapacity: 0 }), toApex);
+  run.same("pot de capacité nulle : la nouvelle perdue depuis la main, sa Perte jouée", [["lost:mourner:hand", "loss:mourner"], 5], [steps(zero.events), zero.state.speed]);
+  run("pot de capacité nulle : sa Perte joue même pot verrouillé (elle ne sort pas du pot)", 5, mustReduce(rules, { ...marblesPlayState(rules, { hand: inHand(["pocketer", "mourner"]), potCapacity: 0 }), statuses: [statusInstance("no_pot", { remaining: null })] }, toApex).state.speed);
+
+  run("fiche : « Perte : Vitesse +5. »", "card.loss{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 5}]}]}}", marbleCard("mourner", "x", rules, t, { timeless: true }).below[0]);
+  run("Perte : une cible relative refusée (aucun emplacement de référence)", true, throws(() => validateTable({ wrong: { loss: [polish(1, NEXT_SLOT)] } })));
+  run("Perte : une action sur elle-même refusée (elle est perdue)", true, throws(() => validateTable({ wrong: { loss: [pocket()] } })));
+  run("Perte : un bonus à un emplacement permis", false, throws(() => validateTable({ fine: { loss: [{ ...speed(2), target: "apex" }] } })));
 }
 
 // La déclaration : la portée et l'exigence, refusées hors de leur cadre.

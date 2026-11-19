@@ -67,9 +67,13 @@ function checkKnockedOut(run) {
   run("Empocher la bille éjectée : aucune bille perdue ni dupliquée", marbleCount(state(pocketing)), marbleCount(pocketed.state));
   run("Empocher la bille éjectée : prévision égale au réel", true, forecastMatches(rules, state(pocketing), toApex));
 
-  // Pot plein : perdue, sans entrée.
+  // Pot plein : il déborde, la plus ancienne se perd, la bille éjectée entre.
   const fullPot = place({ ...pocketing, pot: ["plain", "plain", "plain"] });
-  run.same("Empocher la bille éjectée, pot plein : perdue, sans entrée", { lost: ["victim"], speed: 3 }, { lost: fullPot.state.lost, speed: fullPot.state.speed });
+  run.same(
+    "Empocher la bille éjectée, pot plein : débordement, la plus ancienne perdue, l'éjectée entre (+10)",
+    { lost: ["plain"], pot: ["plain", "plain", "victim"], speed: 13 },
+    { lost: fullPot.state.lost, pot: fullPot.state.pot, speed: fullPot.state.speed }
+  );
 
   // Rebond : en main, à 0 tour en main, sans Chute ; main pleine, la défausse et sa Chute.
   const returning = { hand: inHand(["returner"]), triangle: { rightBase: null, leftBase: null, apex: placed("victim") } };

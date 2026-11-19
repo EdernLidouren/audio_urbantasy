@@ -108,6 +108,8 @@ const NAMED_MARBLE = {
   // À la défausse : l'emplacement qu'elle a quitté, si elle vient du triangle (sa
   // Chute se prévoit avec lui), sinon aucun.
   dropped: (event) => ({ slot: event.from === "triangle" ? event.slot : null, marble: event.marble }),
+  // Perdue : sortie de la partie, sans emplacement.
+  lost: (event) => ({ slot: null, marble: event.marble }),
   thrown: (event) => ({ slot: event.slot, marble: event.marble, turnsInHand: event.turnsInHand }),
 };
 // Chaque valeur `marble` d'un déclencheur a sa zone ; chaque bille nommée hors du
@@ -136,6 +138,9 @@ function eventTrigger(trigger) {
       zones: trigger.forecast.line === "none" ? [] : [zone],
       listeners: (event) => [{ zone: HOLDER_ZONES[trigger.marble].zone, ...NAMED_MARBLE[trigger.marble](event) }],
       clauses: (event, listener, types) => clausesOf(event, listener, types),
+      // Une bille qui quitte le POT (`potLock`, la Perte d'un débordement) : le verrou
+      // du pot la fait taire, comme les autres billes du pot (handleEvent).
+      ...(trigger.potLock === true && { potLock: (event) => event.from === "pot" }),
     };
   }
   // Sur le triangle : la bille de l'emplacement de l'évènement ("self"), ou toute bille
@@ -288,6 +293,9 @@ function fireEffect(run, trigger, listener, clauses, event) {
     triangle: run.state.triangle,
     holder: { marble, zone: listener.zone, slot: slot ?? null, turnsInHand: listener.turnsInHand ?? 0, departed: ownTrace ? event.departed : null },
     replacement: event.replacement ?? null,
+    // L'emplacement que concerne l'évènement (la bille polie, fêlée), que lit la
+    // condition « concerned ».
+    concerned: event.slot ?? null,
     tally: run.state.tally,
     state: run.state,
     statuses: run.statuses,
@@ -564,7 +572,9 @@ function wearOnSlot(run, action, amount, slot, by) {
 // émises dans la file : pas de récursion.
 function handleEvent(run, event) {
   const trigger = EVENT_TRIGGERS[event.type];
-  const silenced = trigger?.lock !== undefined && isLocked(run.state.statuses, run.statuses, trigger.lock.lock, trigger.lock.trigger ?? null);
+  const silenced =
+    (trigger?.lock !== undefined && isLocked(run.state.statuses, run.statuses, trigger.lock.lock, trigger.lock.trigger ?? null)) ||
+    (trigger?.potLock?.(event) === true && isLocked(run.state.statuses, run.statuses, "pot"));
   const listeners = !trigger || silenced ? [] : trigger.listeners ? trigger.listeners(event) : marbleListeners(run.state);
   for (const listener of listeners) {
     // Une bille inconnue (piochée à l'aveugle) que ce déclencheur pourrait
@@ -659,6 +669,9 @@ export function transact(state, types, { eventLimit, blind = false, answers = []
     // de lancer (marbles/core/marbles.js/placeMarble), vers l'emplacement `slot` ;
     // "leaving", en partance (travel), depuis l'emplacement `slot` ou null.
     inTransit: [],
+    // Les arrivées au pot de cette action, comptées (marbles/core/path.js/sendToPot) :
+    // la place d'une bille qui y entre, après les pertes d'un débordement.
+    potArrivals: 0,
   };
   const bus = createEventBus((event) => handleEvent(run, event), eventLimit, () => record({ type: "chainInterrupted" }));
   // Le journal s'écrit À L'ÉMISSION, dans l'ordre où l'état change : la file du bus

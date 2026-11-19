@@ -39,7 +39,8 @@ export function handRoom(run) {
 //      ne s'annule jamais.
 //   3. DESTINATION : la défausse par défaut, ou celle qu'une redirection a posée.
 //   4. ARRIVÉE (arrive) : dans la défausse (`discarded`, sa Chute), au pot
-//      (`pocketed`, son entrée ; plein, `lost`, sans effet d'entrée), en main
+//      (`pocketed`, son entrée ; plein, il déborde : la plus ancienne se perd,
+//      `lost`, avant cette entrée : sendToPot), en main
 //      (`returned`, aucun déclencheur ; pleine, la défausse à la place).
 // Le trajet en cours est dans `run.inTransit` le temps du déclencheur de sortie : un
 // choix qui s'ouvre alors l'emporte (pendingChoice.inTransit).
@@ -202,19 +203,35 @@ export function moveFromBag(run, count, action, by) {
   }
 }
 
-// L'arrivée au pot ; plein, la bille est perdue. Au pot, ses effets d'entrée se
-// règlent aussitôt (une interruption : run.settle), avant la suite. `extra` :
-// `redirected` quand une redirection l'y a envoyée (son déclenchement d'Empocher
-// est déjà compté par `redirected`).
+// L'ARRIVÉE AU POT, et son DÉBORDEMENT. La bille y entre ; si le pot dépasse alors sa
+// capacité en vigueur (statuts compris), il DÉBORDE : la plus ANCIENNE en sort et se
+// perd (`lost`, cause "overflow", depuis le pot, place 0 : son déclencheur Perte),
+// autant de fois qu'il le faut (une capacité qu'un statut a réduite), PUIS l'entrée
+// de la nouvelle se règle. Le pot n'est ainsi jamais au-delà de sa capacité quand
+// quelque chose le lit. Une capacité 0 pousse dehors la nouvelle elle-même : elle se
+// perd depuis là d'où elle venait, sans entrée. Chaque perte et l'entrée sont des
+// interruptions (run.settle), réglées jusqu'au bout, réactions comprises. `extra` :
+// `redirected` quand une redirection l'y a envoyée (son déclenchement d'Empocher est
+// déjà compté par `redirected`), porté par l'arrivée de cette bille seulement.
 function sendToPot(run, marble, origin, by, extra = {}) {
-  if (run.state.pot.length < characteristic(run.state, "potCapacity", run.statuses)) {
-    run.update({ pot: [...run.state.pot, marble] });
-    run.settle({ type: "pocketed", marble, ...origin, potIndex: run.state.pot.length - 1, by, ...extra });
-    return;
-  }
-  run.update({ lost: [...run.state.lost, marble] });
-  // Une arrivée comme les autres : réglée aussitôt, ses réactions comprises.
-  run.settle({ type: "lost", marble, ...origin, by, ...extra });
+  run.potArrivals += 1;
+  const arrival = run.potArrivals;
+  const pot = [...run.state.pot, marble];
+  const overflow = Math.max(0, pot.length - characteristic(run.state, "potCapacity", run.statuses));
+  run.update({ pot: pot.slice(overflow) });
+  pot.slice(0, overflow).forEach((pushed, index) => {
+    const arriving = index === pot.length - 1;
+    run.update({ lost: [...run.state.lost, pushed] });
+    const from = arriving ? { ...origin, ...extra } : { from: "pot", index: 0 };
+    run.settle({ type: "lost", marble: pushed, ...from, cause: "overflow", by });
+  });
+  if (overflow === pot.length) return;
+  // Sa place, comptée depuis la fin : une bille arrivée après elle pendant les pertes
+  // (une réaction qui empoche) est derrière elle ; si les pertes l'ont poussée dehors
+  // à son tour, plus d'entrée.
+  const potIndex = run.state.pot.length - 1 - (run.potArrivals - arrival);
+  if (potIndex < 0) return;
+  run.settle({ type: "pocketed", marble, ...origin, potIndex, by, ...extra });
 }
 
 // La bille de `slot` est CHASSÉE par l'effet `by` : `eject`, puis son trajet

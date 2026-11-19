@@ -307,13 +307,13 @@ function checkEvents(run) {
   run.same(
     "pot : une mise en poche, son entrée, Empocher et sa bille déplacée",
     { pocketedMarbles: 1, pocketEntry: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(hitPocket, fixedRules.reduce(hitPocket, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+    pick(added(hitPocket, fixedRules.reduce(hitPocket, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles", "overflows"])
   );
   const full = { ...hitPocket, pot: ["aging_flick", "hit_polish", "awaken_draw"] };
   run.same(
-    "pot plein : une bille perdue, pas d'entrée, une bille déplacée quand même",
-    { lostMarbles: 1, pocket: 1, pocketQuantity: 1 },
-    pick(added(full, fixedRules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles"])
+    "pot plein : un débordement, la plus ancienne perdue, la nouvelle empochée et son entrée, une seule bille déplacée",
+    { pocketedMarbles: 1, pocketEntry: 1, pocket: 1, pocketQuantity: 1, lostMarbles: 1, overflows: 1 },
+    pick(added(full, fixedRules.reduce(full, { type: "place", handIndex: 0, slot: "apex" }).state), ["pocketedMarbles", "pocketEntry", "pocket", "pocketQuantity", "lostMarbles", "overflows"])
   );
   // Sans effet d'entrée (aging_flick) : la mise en poche compte, pas l'entrée.
   const plainEntry = playState({ hand: inHand(["hit_pocket", "aging_flick"]), triangle: { leftBase: null, rightBase: null, apex: placed("aging_flick") } });

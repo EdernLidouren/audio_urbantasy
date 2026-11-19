@@ -90,19 +90,25 @@ function checkPocket(run) {
   const emptyHand = apply(playState({ hand: inHand(["hit_pocket"]), triangle: triangleOf(null, null, placed("aging_flick")) }), { type: "place", handIndex: 0, slot: "apex" });
   run("Empocher, main vide : noté", "targetEmpty:pocket:firstInHand", withoutOccupant(emptyHand.events).at(-1));
 
-  // Pot plein : la bille est perdue, sans effet d'entrée.
+  // Pot plein : il DÉBORDE. La plus ancienne en sort et se perd, puis la nouvelle entre,
+  // son effet d'entrée compris.
   const full = apply(
     playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: triangleOf(null, null, placed("aging_flick")), pot: ["aging_flick", "hit_polish", "awaken_draw"] }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("pot plein : la bille perdue, sans effet d'entrée", ["effect:hit:hit_pocket", "lost:fragile:hand"], withoutOccupant(full.events).slice(-2));
-  run.same("pot plein : pot inchangé, la bille chez les perdues", { pot: ["aging_flick", "hit_polish", "awaken_draw"], lost: ["fragile"] }, { pot: full.state.pot, lost: full.state.lost });
-  run("pot plein : ni entrée ni Vitesse +10", 4, full.state.speed);
+  run.same(
+    "pot plein, débordement : la plus ancienne perdue depuis le pot, puis la nouvelle entre",
+    ["lost:aging_flick:pot", "pocketed:fragile:hand", "effect:pocketEntry:fragile"],
+    journal(full.events).filter((entry) => /^(lost|pocketed|effect:pocketEntry)/.test(entry))
+  );
+  run.same("pot plein, débordement : la plus ancienne chez les perdues, la nouvelle au bout du pot", { pot: ["hit_polish", "awaken_draw", "fragile"], lost: ["aging_flick"] }, { pot: full.state.pot, lost: full.state.lost });
+  run("pot plein, débordement : l'entrée comptée (Vitesse +10)", 14, full.state.speed);
   const zero = apply(
     playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: triangleOf(null, null, placed("aging_flick")), potCapacity: 0 }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
   run.same("pot de capacité nulle : toute bille empochée est perdue", [], zero.state.pot);
+  run.same("pot de capacité nulle : perdue depuis la main, sans entrée", ["lost:fragile:hand"], withoutOccupant(zero.events).filter((line) => line.startsWith("lost") || line.startsWith("pocketed")));
 
   // Depuis un emplacement, pendant la résolution : base_pocket en base empoche la
   // pointe ; ni usure ni éjection (pas de Final) ; la phase de pointe est sautée.

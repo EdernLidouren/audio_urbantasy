@@ -13,10 +13,8 @@ Les points repoussés « à plus tard », une ligne par point, avec son origine 
 
 ## Mécaniques décidées, à venir
 
-Décidées avec la terminologie de novembre 2026 (évènement au participe, déclencheur en nom, action en verbe : `doc/marbles-rules.md`, section 8). Dans cet ordre : le débordement et la Perte, puis les nouvelles mécaniques.
+Décidées avec la terminologie de novembre 2026 (évènement au participe, déclencheur en nom, action en verbe : `doc/marbles-rules.md`, section 8). Le débordement du pot et le déclencheur Perte sont faits ; restent :
 
-- Le débordement, nouvelle règle du pot : une bille qui arrive dans un pot plein y entre, la plus ancienne en sort et se perd, puis l'entrée de la nouvelle joue. Un évènement de la partie, « à chaque débordement ». La Perte d'une bille poussée dehors sous la règle « pot inerte » est à trancher (proposition : elle ne joue pas).
-- Le déclencheur Perte (en anglais Lost) : quand cette bille est perdue, au moment où elle quitte la partie, comme un Final. L'évènement « bille perdue » existe déjà.
 - L'action Perdre (en anglais Lose ; « Maladresse » dans les notes de l'auteur) : sort une bille de la partie, depuis le triangle, la main, la défausse, le sac ou le pot, au choix ou non, ou la bille elle-même.
 - L'évènement de la partie « main pleine » : chaque bille qui ne peut pas entrer en main, la pioche bloquée (elle reste au sac) comme le retour refusé (Rebondir ou Ramasser, main pleine). Sans déclencheur de bille : la bille refusée resterait cachée au sac.
 - Les évènements « bille renvoyée en main », « bille polie » et « bille fêlée » (au moins 1 point d'usure), écoutables : aujourd'hui, seuls les déclenchements de Polissage et de Fêlure, et les effets Polir et Fêler, se comptent.

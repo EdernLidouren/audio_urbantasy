@@ -136,6 +136,9 @@ const PLACEMENT_TRIGGERS = MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.
 const triggerIds = (line) => new Set(MARBLE_TRIGGERS.filter((trigger) => trigger.forecast.line === line).map((trigger) => trigger.id));
 const SLOT_TRIGGERS = triggerIds("slot");
 const REGENERATION_TRIGGERS = triggerIds("regeneration");
+// Ceux qui se prévoient avec la mise en poche qui les provoque (la Perte d'une bille
+// qu'un débordement pousse hors du pot).
+const POCKET_TRIGGERS = triggerIds("pocket");
 
 const FORECASTABLE_ACTIONS = ["place", "swap"];
 
@@ -174,13 +177,15 @@ function awakenPossible(state, events, types) {
 // déclencheur, la même bille, le même emplacement).
 //   pockets : ce que ses Empocher ont déplacé (pocketed, lost), avec l'effet
 //             d'entrée qui suit aussitôt une mise en poche (une interruption : il
-//             vient juste après), un évènement ou null ;
+//             vient juste après), un évènement ou null ; et ce qu'un débordement a
+//             perdu (lost : la plus ancienne du pot, avant l'entrée de la nouvelle),
+//             avec l'effet de sa Perte (`loss`), qui suit aussitôt, ou null ;
 //   empty   : ses cibles vides (targetEmpty) ;
 //   undecided : ses choix indécis (choiceUndecided) ;
 //   ejected : les billes que ses Éjecter ont chassées (eject), avec l'effet de leur
 //             Éjection, l'effet `knockout` qui porte `ejectedBy` sur leur emplacement
 //             avant leur départ (une interruption : il vient juste après), ou null.
-// -> Map effet -> { pockets: [{ marble, lost, entry }], empty: [{ action, slot, ... }],
+// -> Map effet -> { pockets: [{ marble, lost, entry, loss }], empty: [{ action, slot, ... }],
 //    undecided: [{ action }], ejected: [{ marble, slot, knockout }] }.
 //   discards : les billes que ses Défausser ont envoyées à la défausse depuis la
 //             main ou le sac (`discarded` qui porte `by`), avec l'effet de leur Chute,
@@ -239,7 +244,8 @@ function resultsByEffect(events) {
       return;
     }
     const entry = event.type === "pocketed" && next?.type === "effect" && ENTRY_TRIGGERS.has(next.trigger) && next.marble === event.marble ? next : null;
-    found.pockets.push({ marble: event.marble, lost: event.type === "lost", entry });
+    const loss = event.type === "lost" && next?.type === "effect" && POCKET_TRIGGERS.has(next.trigger) && next.marble === event.marble ? next : null;
+    found.pockets.push({ marble: event.marble, lost: event.type === "lost", entry, loss });
   });
   return results;
 }
@@ -257,7 +263,9 @@ function outcomeReader(events) {
     if (found === undefined) return outcome;
     return {
       ...outcome,
-      ...(found.pockets.length > 0 && { pockets: found.pockets.map(({ marble, lost, entry }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry) })) }),
+      ...(found.pockets.length > 0 && {
+        pockets: found.pockets.map(({ marble, lost, entry, loss }) => ({ marble, lost, entry: entry === null ? null : outcomeOf(entry), loss: loss === null ? null : outcomeOf(loss) })),
+      }),
       ...(found.empty.length > 0 && { empty: found.empty }),
       ...(found.undecided.length > 0 && { undecided: found.undecided }),
       ...(found.ejected.length > 0 && {

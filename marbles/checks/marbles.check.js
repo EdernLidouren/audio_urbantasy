@@ -563,8 +563,8 @@ function checkDrawEffects(run) {
 // La liste des déclencheurs, déclarée une fois (marbles/config/values.js).
 function checkTriggers(run) {
   run.same(
-    "déclencheurs : éveil, chiquenaude, tic, trouvaille, éjection, final, chute, polissage et fêlure reçus, dans l'ordre de la fiche",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "polished", "cracked"],
+    "déclencheurs : éveil, chiquenaude, tic, trouvaille, éjection, final, chute, polissage, fêlure et perte, dans l'ordre de la fiche",
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "polished", "cracked", "loss"],
     MARBLE_TRIGGERS.map((trigger) => trigger.id)
   );
   run("déclencheurs : la vraie liste acceptée", false, throws(() => validateMarbleTriggers(MARBLE_TRIGGERS)));

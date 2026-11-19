@@ -38,6 +38,7 @@ import {
   allOf,
   bounce,
   choice,
+  concerned,
   conditioned,
   count,
   crack,
@@ -109,6 +110,7 @@ const CONDITION_EXAMPLES = {
     clauses: [when(speed(4), allOf(count(zoneCount("triangle", sizeIs(SMALL)), { atLeast: 1 }), count(zoneCount("triangle", sizeIs(LARGE)), { atLeast: 1 })))],
   },
   stat: { label: "Compteur du tour (Vitesse, Masse) comparé à une borne", clauses: [when(speed(4), statIs("mass", { atMost: 1 }))] },
+  concerned: { label: "La bille visée par un Polissage ou une Fêlure : cette bille, ou une autre", clauses: [when(speed(3), concerned("self"))] },
 };
 
 // LES FORMES d'une condition, communes à toutes : la négation, le sinon, une
