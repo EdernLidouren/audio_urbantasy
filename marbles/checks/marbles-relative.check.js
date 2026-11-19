@@ -172,7 +172,7 @@ function checkValidationAndTexts(run) {
 
   const card = (type) => marbleCard("x", "x", fabricatedRules({ x: type }), t);
   run("texte : bonus à la suivante", "card.base{effect: effect.combined{parts: [effect.given_relative{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, relative: next}]}}", card({ base: [{ action: "speed", amount: 2, target: NEXT }] }).above[1]);
-  run("texte : Polissage à la précédente", "card.apex{effect: effect.combined{parts: [effect.given_relative{effect: effect.combined{parts: [effect.polish{amount: 1}]}, relative: previous}]}}", card({ apex: [{ action: "polish", amount: 1, target: PREVIOUS }] }).above[0]);
+  run("texte : Polissage à la précédente", "card.apex{effect: effect.combined{parts: [effect.wear_relative{effect: effect.combined{parts: [effect.polish{amount: 1}]}, relative: previous}]}}", card({ apex: [{ action: "polish", amount: 1, target: PREVIOUS }] }).above[0]);
   run("texte : Éjecter la suivante", "card.knockout{effect: effect.combined{parts: [effect.eject_relative{relative: next}]}}", card({ knockout: [{ action: "eject", target: NEXT }] }).below[0]);
   run(
     "texte : condition sur la suivante",

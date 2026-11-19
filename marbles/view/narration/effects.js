@@ -107,12 +107,27 @@ export function formatCounter(value) {
 // dans l'ordre où ses valeurs se disent : `up` pour une valeur positive, `down`
 // pour une négative (absent : l'action n'en produit jamais, sa validation le
 // refuse). Chacun reçoit {amount}, toujours positif.
+// `given` (facultatif) : les tournures d'une action dite par un VERBE suivi de sa
+// cible, « Polir de 1 la bille de l'emplacement suivant », au lieu du don d'une
+// valeur, « Vitesse +2 à la pointe » (targetedText) ; `self`, la bille elle-même,
+// « Polir de 1 cette bille ». Chacune reçoit {effect}, le texte de `up`.
+const WEAR_GIVEN = {
+  self: "marbles.effect.wear_self",
+  slot: "marbles.effect.wear_slot",
+  relative: "marbles.effect.wear_relative",
+  choice: "marbles.effect.wear_choice",
+};
+const VALUE_GIVEN = {
+  slot: "marbles.effect.given",
+  relative: "marbles.effect.given_relative",
+  choice: "marbles.effect.given_choice",
+};
 const ACTION_TEXTS = {
   speed: { up: "marbles.effect.speed_up", down: "marbles.effect.speed_down" },
   mass: { up: "marbles.effect.mass_up", down: "marbles.effect.mass_down" },
   draw: { up: "marbles.effect.draw" },
-  polish: { up: "marbles.effect.polish" },
-  crack: { up: "marbles.effect.crack" },
+  polish: { up: "marbles.effect.polish", given: WEAR_GIVEN },
+  crack: { up: "marbles.effect.crack", given: WEAR_GIVEN },
   // Sans montant ; son texte dépend de sa cible (actionText) : la bille elle-même
   // (`up`), un emplacement (`slot`, qui reçoit {slot}), la première de la main, une
   // bille au choix (`choice`, qui reçoit {target}).
@@ -241,8 +256,8 @@ export function valueParts(values, t) {
   return parts;
 }
 
-// Le texte d'une action sur une bille, sa cible comprise : « Polissage 1 », « Fêlure
-// 1 à la pointe ». Une action qui a ses propres textes par cible (Empocher) les dit
+// Le texte d'une action sur une bille, sa cible comprise : « Polir de 1 cette bille »,
+// « Fêler de 1 la bille en pointe ». Une action qui a ses propres textes par cible (Empocher) les dit
 // elle-même : « Empocher cette bille », « Empocher la bille en pointe », « Empocher la
 // première bille de la main ».
 function actionText(action, amount, target, t) {
@@ -257,19 +272,27 @@ function actionText(action, amount, target, t) {
     if (target === FIRST_IN_HAND || target === LAST_DISCARDED || target === KNOCKED_OUT) return t(targets[target]);
     return t(targets.slot, { slot: slotName(target, t) });
   }
-  const text = t(up, { amount });
-  return target === undefined ? text : targetedText(text, target, t);
+  return withTarget(t(up, { amount }), action, target, t);
 }
 
-// Un effet dit avec sa cible : un emplacement (« Polissage 1 à la pointe ») ou un
-// choix (« Polissage 1 à une bille active au choix », « Polissage 1, jusqu'à 2 billes
+// Un texte d'action à montant (`up`) avec sa cible, ou sans cible pour une action qui
+// se dit par un verbe (`given.self` : « Polir de 1 cette bille »).
+function withTarget(text, action, target, t) {
+  if (target !== undefined) return targetedText(text, target, t, ACTION_TEXTS[action].given);
+  const self = ACTION_TEXTS[action].given?.self;
+  return self === undefined ? text : t(self, { effect: text });
+}
+
+// Un effet dit avec sa cible : un emplacement (« Vitesse +2 à la pointe ») ou un
+// choix (« Vitesse +2 à une bille active au choix », « Vitesse +2, jusqu'à 2 billes
 // actives au choix » : un choix facultatif choisit la tournure, jamais « à
-// jusqu'à »).
-function targetedText(text, target, t) {
+// jusqu'à »). Une action dite par un verbe a ses propres tournures (`given`) :
+// « Polir de 1 la bille en pointe ».
+function targetedText(text, target, t, given = VALUE_GIVEN) {
   // Relative : « Vitesse +2 à la bille de l'emplacement suivant ».
-  if (isRelative(target)) return t("marbles.effect.given_relative", { effect: text, relative: relativeWord(target) });
-  if (isChoice(target)) return t("marbles.effect.given_choice", { effect: text, target: choiceTarget(target, t), upTo: isOptionalChoice(target) ? "yes" : "no" });
-  return t("marbles.effect.given", { effect: text, slot: slotName(target, t) });
+  if (isRelative(target)) return t(given.relative, { effect: text, relative: relativeWord(target) });
+  if (isChoice(target)) return t(given.choice, { effect: text, target: choiceTarget(target, t), upTo: isOptionalChoice(target) ? "yes" : "no" });
+  return t(given.slot, { effect: text, slot: slotName(target, t) });
 }
 
 // Les actions sur une bille d'un effet ([{ action, amount?, target? }]) -> leurs
@@ -543,10 +566,14 @@ function describeBranch(clause, situation, t, statuses) {
     const text = status ? statusText(statusApplication(clause, definitionOf(statuses, clause.status)), t) : actionText(clause.action, undefined, clause.target, t);
     return clause.when === undefined ? text : t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   }
-  let text = Number.isInteger(clause.amount)
-    ? combined(valueParts({ [clause.action]: clause.amount }, t), t)
-    : computedText(clause.action, clause.amount, situation, t);
-  if (clause.target !== undefined) text = targetedText(text, clause.target, t);
+  // Un montant fixe se dit avec sa cible, ou « cette bille » pour une action dite par
+  // un verbe ; un montant calculé, sans « cette bille », qui couperait sa phrase.
+  let text;
+  if (Number.isInteger(clause.amount)) text = withTarget(combined(valueParts({ [clause.action]: clause.amount }, t), t), clause.action, clause.target, t);
+  else {
+    text = computedText(clause.action, clause.amount, situation, t);
+    if (clause.target !== undefined) text = targetedText(text, clause.target, t, ACTION_TEXTS[clause.action].given);
+  }
   if (clause.when !== undefined) text = t("marbles.effect.conditional", { effect: text, condition: CONDITION_TEXTS[clause.when.type](clause.when, t) });
   return text;
 }

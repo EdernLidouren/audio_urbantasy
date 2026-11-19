@@ -304,7 +304,7 @@ function checkWitness(run) {
   const expected = {
     fr: [
       "Vitesse +3 si le triangle compte au moins 1 calot, sinon Vitesse +1",
-      "Fêlure 1 à la bille de l'emplacement suivant si la bille de l'emplacement suivant n'est pas de la famille Bestiaire",
+      "Fêler de 1 la bille de l'emplacement suivant si la bille de l'emplacement suivant n'est pas de la famille Bestiaire",
       "Empocher cette bille si la bille de l'emplacement précédent est une abeille",
       "Vitesse +2 si vous avez au plus 3 billes en main",
       "Vitesse +4 si la Masse est d'au plus 1",
@@ -312,12 +312,12 @@ function checkWitness(run) {
       "Vitesse −2 si l'emplacement suivant est vide",
       "Vitesse +2 par abeille dans le pot",
       "Masse +1 si le pot compte au moins 3 abeilles",
-      "Vitesse +1 si cette partie compte au moins 2 éveils",
+      "Vitesse +1 si cette partie compte au moins 2 Éveils déclenchés",
       "Masse +3 si le triangle compte au moins 1 minibille et le triangle compte au moins 1 calot",
     ],
     en: [
       "Speed +3 if the triangle holds at least 1 boulder, otherwise Speed +1",
-      "Crack 1 to the marble in the next slot if the marble in the next slot does not belong to the Bestiary family",
+      "Crack 1 on the marble in the next slot if the marble in the next slot does not belong to the Bestiary family",
       "Pocket this marble if the marble in the previous slot is a bee",
       "Speed +2 if you have at most 3 marbles in hand",
       "Speed +4 if Mass is at most 1",
@@ -325,19 +325,19 @@ function checkWitness(run) {
       "Speed −2 if the next slot is empty",
       "Speed +2 per bee in the pot",
       "Mass +1 if the pot holds at least 3 bees",
-      "Speed +1 if this game has at least 2 awakenings",
+      "Speed +1 if this game has at least 2 Awaken triggers",
       "Mass +3 if the triangle holds at least 1 peewee and the triangle holds at least 1 boulder",
     ],
   };
   const GROUPED = {
     fr: [
       "Vitesse +5 et Masse +1 si le triangle compte au plus 1 bille",
-      "Fêlure 1 à la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide",
+      "Fêler de 1 la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide",
       "Vitesse +2 et Masse +1",
     ],
     en: [
       "Speed +5 and Mass +1 if the triangle holds at most 1 marble",
-      "Crack 1 to the marble in the next slot; Speed −2 if the next slot is empty",
+      "Crack 1 on the marble in the next slot; Speed −2 if the next slot is empty",
       "Speed +2 and Mass +1",
     ],
   };

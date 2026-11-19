@@ -99,7 +99,7 @@ import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
 import { CHOICELESS_TYPES, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureDefinition, fixtureRules } from "./fixtures/marbles.js";
-import { choice, draw, polish, speed } from "../content/effects.js";
+import { NEXT_SLOT, bounce, choice, crack, draw, polish, speed } from "../content/effects.js";
 import { ruleInstance } from "../core/statuses.js";
 import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, overState, statusInstance } from "./helpers.js";
 import { choiceAnswer, choiceCursorAfterAnswer, choiceFocusLine, choiceHandOptions, choiceListEntry, choiceStartCursor, stepChoiceCursor } from "../view/choice.js";
@@ -276,7 +276,7 @@ function checkCards(run) {
           "card.base{effect: effect.combined{parts: [effect.pocket_slot{slot: slot.apex}]}}",
         ],
         below: [
-          "card.windfall{effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.crack{amount: 1}]}, slot: slot.rightBase}]}}",
+          "card.windfall{effect: effect.combined{parts: [effect.wear_slot{effect: effect.combined{parts: [effect.crack{amount: 1}]}, slot: slot.rightBase}]}}",
           "card.pocketed_resolution{effect: effect.combined{parts: [effect.per_zone_size_triangle{effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, zone: triangle, size: <size.small.name>}]}}",
         ],
       },
@@ -307,13 +307,13 @@ function checkCards(run) {
       "fiche : la Pioche en base, un Polissage sur soi, une Éjection conditionnée au calibre",
       {
         above: [
-          "card.apex{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 2}]} | effect.combined{parts: [effect.polish{amount: 1}]}]}}",
+          "card.apex{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 2}]} | effect.wear_self{effect: effect.combined{parts: [effect.polish{amount: 1}]}}]}}",
           "card.base{effect: effect.combined{parts: [effect.combined{parts: [effect.draw{amount: 1}]}]}}",
         ],
         below: [
           "card.awaken{effect: effect.combined{parts: [effect.combined{parts: [effect.draw{amount: 1}]}]}}",
           "card.knockout{effect: effect.combined{parts: [effect.conditional{effect: effect.combined{parts: [effect.draw{amount: 1}]}, condition: condition.relativeSize{marble: placed, is: larger}}]}}",
-          "card.pocketed_reaction{effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex}]}, occurrence: tally.shuffles.each}",
+          "card.pocketed_reaction{effect: effect.combined{parts: [effect.wear_slot{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex}]}, occurrence: tally.shuffles.each}",
         ],
       },
       fields("awaken_draw")
@@ -322,14 +322,14 @@ function checkCards(run) {
     run("fiche : comptage par calibre", "card.base{effect: effect.combined{parts: [effect.per_zone_size_triangle{effect: effect.combined{parts: [effect.speed_up{amount: 1}]}, zone: triangle, size: <size.small.name>}]}}", fields("size_count").above[1]);
     run("fiche : calibre d'un emplacement", "card.apex{effect: effect.semicolon{first: effect.combined{parts: [effect.mass_up{amount: 1}]}, rest: effect.conditional{effect: effect.combined{parts: [effect.mass_up{amount: 2}]}, condition: condition.sizeAt{slot: slot.leftBase, size: <size.large.name>, not: no}}}}", fields("final_pocket").above[0]);
     run.same("fiche : un Polissage au choix au Tic", [
-      "card.hit{effect: effect.combined{parts: [effect.given_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}",
+      "card.hit{effect: effect.combined{parts: [effect.wear_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}",
     ], fields("hit_polish").below);
     run.same(
       "fiche : un Polissage ciblé au Final, une Trouvaille entre Tic et Final",
       [
         "card.hit{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]}]}}",
-        "card.windfall{effect: effect.combined{parts: [effect.combined{parts: [effect.polish{amount: 1}]}]}}",
-        "card.final{effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex} | effect.pocket_self]}}",
+        "card.windfall{effect: effect.combined{parts: [effect.wear_self{effect: effect.combined{parts: [effect.polish{amount: 1}]}}]}}",
+        "card.final{effect: effect.combined{parts: [effect.wear_slot{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex} | effect.pocket_self]}}",
         "card.pocketed_resolution{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]}]}}",
       ],
       fields("final_pocket").below
@@ -360,7 +360,7 @@ function checkCards(run) {
       "fiche : la Chiquenaude, le Final, puis En poche à l'entrée de fragile",
       [
         "card.flick{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]}]}}",
-        "card.final{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 4}]} | effect.given_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, upTo: yes}]}}",
+        "card.final{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 4}]} | effect.wear_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.up_to{target: choice.noun.triangle_marble{count: 2}}, upTo: yes}]}}",
         "card.pocketed_entry{effect: effect.combined{parts: [effect.combined{parts: [effect.speed_up{amount: 10}]}]}}",
       ],
       fields("fragile").below
@@ -422,7 +422,7 @@ function checkCards(run) {
     );
     run("fiche : montant calculé d'une Pioche", "card.flick{effect: effect.combined{parts: [effect.computed_current{effect: effect.computed_max{effect: effect.per_turn_in_hand{effect: effect.combined{parts: [effect.draw{amount: 1}]}}, max: 3}, current: 3}]}}", computedCard({ base: 0, step: 1, source, max: 3 }, "draw", 4));
     run.same("fiche : l'Éveil en premier, puis le Final de one_shot", [
-      "card.awaken{effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex}]}}",
+      "card.awaken{effect: effect.combined{parts: [effect.wear_slot{effect: effect.combined{parts: [effect.polish{amount: 1}]}, slot: slot.apex}]}}",
       "card.final{effect: effect.combined{parts: [effect.combined{parts: [effect.draw{amount: 1}]} | effect.eject_all{target: target.all_size{size: <size.small.name>}}]}}",
     ], fields("one_shot").below);
     run.same(
@@ -1820,7 +1820,7 @@ function checkSaid(run, { events, state }) {
         "place.question{marble: <hit_polish>, slot: slot.leftBase}",
         "place.values{effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
         "place.flick{marble: <hit_polish>, effect: effect.none}",
-        "place.hit{marble: <hit_polish>, effect: forecast_choice.after{effect: effect.combined{parts: [effect.given_choice{effect: effect.polish{amount: 1}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}}",
+        "place.hit{marble: <hit_polish>, effect: forecast_choice.after{effect: effect.combined{parts: [effect.wear_choice{effect: effect.polish{amount: 1}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}}",
         "place.knockout{marble: <tally_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.pot{reactions: effect.none}",
       ],
@@ -1988,6 +1988,14 @@ const WITNESSES = {
     ],
     pot: "1 bille dans le pot, 2 billes perdues.",
     impact: "Impact 0. Score 14.",
+    verbs: [
+      "Polir de 1 cette bille",
+      "Fêler de 1 la bille en pointe",
+      "Polir de 1 la bille de l'emplacement suivant",
+      "Fêler de 1 jusqu'à 2 billes actives au choix",
+      "Faire rebondir cette bille",
+      "Piocher 2",
+    ],
   },
   en: {
     confirmation: [
@@ -2032,6 +2040,14 @@ const WITNESSES = {
     ],
     pot: "1 marble in the pot, 2 lost marbles.",
     impact: "Impact 0. Score 14.",
+    verbs: [
+      "Polish 1 on this marble",
+      "Crack 1 on the marble at the apex",
+      "Polish 1 on the marble in the next slot",
+      "Crack 1 on up to 2 active marbles, your choice",
+      "Bounce this marble",
+      "Draw 2",
+    ],
   },
 };
 
@@ -2084,6 +2100,16 @@ function checkWitnesses(run) {
       bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), rules, realT))),
       pot: plain(describePot(game({ pot: ["clay"], lost: ["dragon", "dolphin"] }), realT)),
       impact: plain(stepsText(buildSteps([{ type: "impact", speed: -3, mass: 2, impact: 0, score: 14 }], realT))),
+      // Les actions dites par un verbe (doc/marbles-rules.md, section 8) : sur soi, sur
+      // un emplacement, sur l'emplacement suivant, au choix ; Faire rebondir ; Piocher.
+      verbs: [
+        [polish(1)],
+        [crack(1, "apex")],
+        [polish(1, NEXT_SLOT)],
+        [crack(1, choice({ zones: ["triangle"], count: 2, mode: "optional" }))],
+        [bounce()],
+        [draw(2)],
+      ].map((clauses) => plain(describePrinted(clauses, null, realT))),
     };
   };
   try {
@@ -2103,6 +2129,7 @@ function checkWitnesses(run) {
       run.same(`témoin ${locale} : le sac, pluriel et singulier`, WITNESSES[locale].bag, witness.bag);
       run(`témoin ${locale} : le pot et les billes perdues`, WITNESSES[locale].pot, witness.pot);
       run(`témoin ${locale} : l'Impact et le Score`, WITNESSES[locale].impact, witness.impact);
+      run.same(`témoin ${locale} : les actions dites par un verbe`, WITNESSES[locale].verbs, witness.verbs);
     }
   } finally {
     setLocale(previousLocale);

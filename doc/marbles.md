@@ -113,7 +113,7 @@ droite.
 ## Le tour
 
 Le tour tel que le joueur le joue : `doc/marbles-rules.md`, sections 3 (« Le score »),
-5 (« Le déroulé d'un tour ») et 6 (« La pioche et la régénération du sac »). Côté
+5 (« Le déroulé d'un tour ») et 6 (« La pioche et le mélange du sac »). Côté
 simulation (`marbles/core/marbles.js`) :
 
 - **Les étapes** (`stage`) : `"draw"`, la pioche du tour reste à faire (action `draw`,
@@ -269,14 +269,14 @@ poche », et section 12, « Les réactions des statuts ».
   (`MARBLE_TALLIES`), les déclenchements de mots-clés (déclencheurs, phases, moments
   fixes d'En poche) et ceux des actions mots-clés, et les quantités réelles qui
   comptent des BILLES (`<action>Quantity` d'une action qui déclare `marbleQuantity` :
-  Pioche, Empocher, Éjecter, Défausser, Rebond, Ramasser ; une réaction par bille,
+  Piocher, Empocher, Éjecter, Défausser, Rebondir, Ramasser ; une réaction par bille,
   « à chaque bille déplacée par rebond »). Ne le sont pas, refusés au chargement avec
   leur raison : les quantités de points (`polishQuantity`, `crackQuantity`, l'usure
   rendue ou ajoutée) et Vitesse et Masse (`speedGains`…), qui comptent des points plutôt
   que des occurrences, et les réactions elles-mêmes (`pocketReaction`), qui se
   répondraient sans fin. Le garde-fou contre les boucles lit l'action d'un compteur
-  d'action (`action`), sa quantité comprise : réagir aux billes déplacées par rebond en
-  faisant un Rebond est refusé. Un compteur ajouté d'une
+  d'action (`action`), sa quantité comprise : réagir aux billes renvoyées par effet en
+  faisant Rebondir est refusé. Un compteur ajouté d'une
   catégorie écoutable devient écoutable par construction. Attention aux deux sens d'un
   même mot : `flick`, la Chiquenaude, ne compte que chez une bille qui en a une ; « à
   chaque bille lancée » est `thrownMarbles`.
@@ -339,7 +339,7 @@ bille ». Toute sortie d'une bille de sa zone passe par **un seul déroulé**
    rediriger (« la bille éjectée », `KNOCKED_OUT`) ; la dernière redirection l'emporte.
 3. **Destination** : la défausse par défaut, celle de l'action qui la déplace
    (`CLAUSE_ACTIONS`, `moves` : le pot pour Empocher, la défausse pour Défausser, la main
-   pour Rebond et Ramasser), ou la dernière qu'une redirection a posée (Empocher : le pot ;
+   pour Rebondir et Ramasser), ou la dernière qu'une redirection a posée (Empocher : le pot ;
    Rebond : la main). L'action responsable est notée sur l'arrivée (`movedBy`), que lisent
    ses compteurs.
 4. **Arrivée** : à la défausse (`discarded`, une interruption, `from` : `"triangle"` et son
@@ -388,7 +388,7 @@ pour `meanwhile`) :
 Le joueur entend la bille posée frapper, puis la délogée réagir en partant. Pendant le Tic,
 B n'est nulle part : ni active ni à la défausse (un Tic qui pioche ou qui ramasse ne la
 trouve pas), mais la cible **la bille éjectée** (`KNOCKED_OUT`, forme courte du même nom,
-Empocher et Rebond, dans un Tic seulement, refusée ailleurs à la validation) la redirige
+Empocher et Rebondir, dans un Tic seulement, refusée ailleurs à la validation) la redirige
 vers le pot ou la main ; son Éjection joue quand même ensuite, et peut la rediriger à son
 tour (la dernière redirection l'emporte). Pendant l'Éjection de B, A est déjà sur
 l'emplacement : une cible « toutes les billes actives » ou au choix peut la viser, et un
@@ -538,7 +538,7 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
     prochaines billes du sac (`nextInBag(n)`, `{ type: "bag", count }` : du haut, une par
     une, sans les révéler avant ; un sac plus court donne ce qu'il a, sans régénération ;
     vide, `targetEmpty`, cible `"bag"`). Jamais depuis le pot ;
-  - `bounce`, **Rebond**, sans montant : renvoie en main la bille elle-même (sur le
+  - `bounce`, **Rebondir**, sans montant : renvoie en main la bille elle-même (sur le
     triangle, ou en partance : une redirection), celle d'un emplacement, des billes
     actives au choix, toutes les billes actives filtrées, ou, dans un Tic, la bille
     éjectée (`KNOCKED_OUT`, une redirection) ; à 0 tour en main, sans
@@ -560,8 +560,8 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
   au choix ») : `choice({ zones: ["triangle"], count: 2, mode: "optional" })` ; ou
   **toutes les billes actives**, filtrées : `allActive(sizeIs(SMALL))`. Chaque action
   déclare ce qu'elle accepte dans `CLAUSE_ACTIONS` (`targets`, `choice`, `all`) :
-  aujourd'hui, Éjecter, Défausser et Rebond acceptent « toutes ». Empocher, Éjecter,
-  Défausser, Rebond et Ramasser passent par le chemin des billes (voir « Le chemin des
+  aujourd'hui, Éjecter, Défausser et Rebondir acceptent « toutes ». Empocher, Éjecter,
+  Défausser, Rebondir et Ramasser passent par le chemin des billes (voir « Le chemin des
   billes ») ;
 - **condition** (`when`, facultative) : évaluée au déclenchement ; fausse, la clause ne
   produit rien.
@@ -653,11 +653,11 @@ Tic ou une Éjection, le remplacement en cours.
 | `{ type: "familyAt", slot, family }` (`familyAt(slot, famille)`) | la bille de `slot` est de la famille `family`, parmi d'autres peut-être ; emplacement vide : faux | « si la bille de l'emplacement suivant est de la famille Brume » |
 | `{ type: "rarityAt", slot, rarity }` (`rarityAt(slot, rareté)`) | la bille de `slot` est de rareté `rarity`, exactement ; emplacement vide : faux | « si la pointe est une bille rare » |
 | `{ type: "marbleAt", slot, marble }` (`marbleAt(slot, id)`) | la bille de `slot` est la bille `marble` (un id ; la table des billes vérifie qu'il existe, `referencedMarbles`) ; emplacement vide : faux | « Pointe : Empocher cette bille si la bille de l'emplacement précédent est une abeille, sinon Vitesse +3. » |
-| `{ type: "slotIs", slot, state }` (`slotIs(slot, état)`) | l'emplacement `slot` est `empty` (vide) ou `occupied` (occupé) ; un emplacement relatif sans référence n'est ni l'un ni l'autre : faux | « Base : Polissage 1 à la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide. » |
+| `{ type: "slotIs", slot, state }` (`slotIs(slot, état)`) | l'emplacement `slot` est `empty` (vide) ou `occupied` (occupé) ; un emplacement relatif sans référence n'est ni l'un ni l'autre : faux | « Base : Polir de 1 la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide. » |
 | `{ type: "replacementSize", marble, size }` (`replacementSize(bille, calibre)`) | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, celle qui l'éjecte : la posée, ou la bille d'un effet Éjecter) est de calibre `size` ; sans bille (un statut qui éjecte) : faux | « Tic : Vitesse +4 si la bille éjectée est une minibille. », « Éjection : Empocher cette bille si la bille qui l'éjecte est un calot. » |
 | `{ type: "count", source, atLeast \| atMost }` (`count(source, { atLeast })`) | la valeur de `source`, une source de montant (`AMOUNT_SOURCES` : `zoneCount`, `familyCount`, `tally`, `turnsInHand`), est au moins `atLeast` ou au plus `atMost` (une borne exactement, un entier) ; son texte, par sorte de source (`COUNT_TEXTS` de la vue, une source sans texte échoue au chargement) | « si vous avez au plus 3 billes en main », « si le pot compte au moins 3 abeilles » |
 | `{ type: "stat", stat, atLeast \| atMost }` (`statIs(compteur, { atMost })`) | le compteur du tour `stat` (`speed`, `mass`), tel qu'il est au déclenchement, avant l'effet qui le lit, respecte la borne | « Base : Masse +1 si la Vitesse est d'au moins 10, sinon Vitesse +2. » |
-| `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Base : Polissage 1 à la bille de l'emplacement suivant si le triangle est plein. » (tortue), « En poche, à chaque résolution : Masse +1 si le pot est plein. » (lingotin) |
+| `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Base : Polir de 1 la bille de l'emplacement suivant si le triangle est plein. » (tortue), « En poche, à chaque résolution : Masse +1 si le pot est plein. » (lingotin) |
 
 **La négation** : `not: true` (forme courte `not(condition)`) sur une condition qui le déclare (`negatable` : `sizeAt`, `familyAt`, `rarityAt`, `marbleAt`, `replacementSize`) ; refusée ailleurs au chargement. La condition niée est vraie quand son test est faux, emplacement vide compris (« n'est pas de la famille Bestiaire »). Ses textes reçoivent `{not}` (`yes`, `no`). Le test passe par `conditionHolds`, jamais par `CONDITIONS[…].test` seul.
 
@@ -694,11 +694,11 @@ résolution : il ne vaut que s'il arrive avant la phase de sa cible. Donné à u
 vide, il est perdu.
 
 **Les valeurs** d'un effet : une par action de valeur, sous son nom (`{ speed, mass,
-draw }`). Le core les applique, la vue les dit (« Vitesse +2 », « Pioche 1 »), la prévision
+draw }`). Le core les applique, la vue les dit (« Vitesse +2 », « Piocher 1 »), la prévision
 les rend. Les **actions sur une bille** (`polish`, `crack`, `kind: "marble"` dans
 `CLAUSE_ACTIONS`) ne s'additionnent pas : chaque clause s'applique, dans l'ordre, après
 l'annonce de l'effet et sa pioche, et émet son évènement (`polished`, `cracked`). Elles
-se disent chez la bille qui les produit (« Base gauche, X : Fêlure 1 à la pointe. »),
+se disent chez la bille qui les produit (« Base gauche, X : Fêler de 1 la bille en pointe. »),
 jamais dans la valeur de phase de celle qui les reçoit.
 
 ### La règle des cibles
@@ -728,7 +728,7 @@ Une cible n'a de sens que si l'effet ciblé peut encore se produire.
   (`resolveClauses`, appelé par `marbles/core/run.js`/`fireEffect`), la cible et le
   `slot` des conditions ; la suite est celle d'un emplacement fixe (bonus perdu si sa
   phase est passée, noté dans `lost` ; Polissage, Fêlure, Empocher, Éjecter, Défausser,
-  Rebond valides ; emplacement vide, `targetEmpty`). Sans référence (une Chute depuis la
+  Rebondir valides ; emplacement vide, `targetEmpty`). Sans référence (une Chute depuis la
   main) : la clause reste à sa place, sa cible devient `NO_REFERENCE`, elle s'évalue
   comme les autres (condition, montant), puis ne fait rien et se note à sa place
   (`targetEmpty`, cible `"noReference"`, « Pas d'emplacement de référence : sans
@@ -881,7 +881,7 @@ simulation et dans l'écran, pour tous les effets.
 - Les actions qui l'acceptent le déclarent (`CLAUSE_ACTIONS`, `choice` : ses zones et ce
   qui s'y choisit). Aujourd'hui, toutes celles qui acceptent une cible : Empocher et
   Défausser dans la main et sur le triangle, Ramasser dans la défausse, les autres sur
-  le triangle (Polissage, Fêlure, Éjecter, Rebond, et Vitesse et Masse en bonus). Ramasser, vers la main
+  le triangle (Polir, Fêler, Éjecter, Rebondir, et Vitesse et Masse en bonus). Ramasser, vers la main
   (`handLimited`), ne propose jamais plus de choix que de places libres ; sans place, rien
   ne s'ouvre (`targetEmpty`, cible `"handFull"`). Plusieurs billes choisies dans la
   défausse s'y suivent par leur place, décalée des précédentes déjà parties.
@@ -1508,7 +1508,7 @@ une bille (Polissage, Fêlure, Empocher) n'a rien trouvé, `empty` (les évènem
 `targetEmpty`, rattachés par leur `by`) : emplacement vide, main vide, bille déjà partie.
 Le moteur le sait aussi sûrement qu'il joue le coup. R et la confirmation le disent chez
 l'effet, avant ce qu'il a empoché : « Tic de X : Vitesse +4 et Empocher une bille de
-votre main au choix, aucune cible au choix », « Final : Polissage 1 à la pointe et Empocher
+votre main au choix, aucune cible au choix », « Final : Polir de 1 la bille en pointe et Empocher
 cette bille, pointe vide, puis X en poche ». La séquence, elle, le dit à part, comme avant
 (« Main vide : rien à empocher. »).
 
@@ -1603,7 +1603,7 @@ un emplacement, occupé ou non par une bille B :
    « Vitesse +6 », valeurs produites, non nulles, bonus reçu compris, et ce que la bille
    donne à une autre (« Vitesse +4 à la pointe ») ; « aucun effet » si rien ; suivies du
    Final de la bille posée si elle
-   atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
+   atteint son usure maximale ce tour (« Vitesse +6. Final : Piocher 1. ») ;
 3. toujours, « Chiquenaude de A : Vitesse +2 », ou « … : aucun effet » ;
 4. sur un emplacement occupé, « Tic de A : Vitesse +2 », ou « … : aucun effet ». Un
    Empocher prévu s'y dit chez la bille qui le produit, avec ce qu'il déplace et l'entrée
@@ -1630,7 +1630,7 @@ Une Chiquenaude qui viderait l'emplacement visé (une Chiquenaude qui éjecte la
 posée en pointe) laisse les lignes de Tic et d'Éjection à « aucun effet » : elles
 n'auront pas lieu, et le menu garde sa structure.
 
-Une Pioche s'y dit comme une valeur (« Tic de A : Pioche 1 »), sans jamais nommer une
+Piocher s'y dit comme une valeur (« Tic de A : Piocher 1 »), sans jamais nommer une
 bille du sac.
 
 ### Choisir une cible
@@ -1769,7 +1769,7 @@ phase. Final : Vitesse +4. ».
 Vitesse et Masse comprennent ce que le tour a déjà gagné (Tic, Éjection) ; l'Impact
 applique les planchers. Un emplacement dit les valeurs que sa bille PRODUIT, après
 conditions et bonus reçus, jamais un texte de condition : valeurs nulles omises, « aucun
-effet » si rien ; une Pioche est une valeur comme une autre (« Pioche 1 »). Un DON se dit
+effet » si rien ; Piocher est une valeur comme une autre (« Piocher 1 »). Un DON se dit
 chez la bille qui le fait, et se compte chez celle qui le reçoit : une bille en base
 gauche qui donne Vitesse +4 à la pointe dit « Vitesse +4 à la pointe », la bille de
 pointe qu'elle renforce, dont la phase donne Vitesse +6, « Vitesse +10 ». C'est la même
@@ -1782,7 +1782,7 @@ sera régénéré. Trouvaille de X : Vitesse +3. Le sac sera de nouveau régén�
 Trouvaille de X : Vitesse +3. ». Après les trois emplacements et avant les régénérations,
 une ligne par bille du pot qui jouerait quelque chose pendant la résolution, dans l'ordre
 d'arrivée : son effet à chaque résolution et ses réactions, regroupés (« Pot, X : Masse
-+1. », « Pot, Y : Polissage 1 à la pointe. ») ; aucune pour les autres. Puis, de même,
++1. », « Pot, Y : Polir de 1 la bille en pointe. ») ; aucune pour les autres. Puis, de même,
 une ligne par statut qui réagirait pendant la résolution (`statusEffects`, « Ferveur :
 Vitesse +2. »). Le résumé les compte. Si un Éveil est
 possible, « Éveils possibles. » termine l'annonce ; si la limite de sécurité arrêterait la
@@ -1807,13 +1807,13 @@ chacune :
    +1. »), avec la pause habituelle, avant les retraits ; une réaction du pot ou d'un
    statut se dit à sa place chronologique, sa propre étape avec la pause habituelle,
    selon la règle d'ordre des réactions (voir « Les réactions » : après l'effet de la
-   bille concernée ; « Pot, X : Polissage 1 à la pointe. », après le mélange et la pioche
+   bille concernée ; « Pot, X : Polir de 1 la bille en pointe. », après le mélange et la pioche
    qui l'ont provoqué), pendant la résolution comme pendant une pose (« Chiquenaude de
    Y : … », puis « Pot, X : Vitesse +2. », puis « Ferveur : Vitesse +2. »), et entre dans
    l'historique ; une mise en poche se dit après l'effet qui la produit (« X est mise en
    poche. », « Entrée au pot de X : Vitesse +10. Vitesse 10, Masse 1. », ou « Le pot est
    plein : X est perdue. ») ; une phase qui pioche est suivie de sa pioche (« Base
-   gauche, X : Pioche 1. », « Vous piochez Y. ») ; un Polissage ou une Fêlure, de son
+   gauche, X : Piocher 1. », « Vous piochez Y. ») ; Polir ou Fêler, de son
    application (« X se fêle : usure 2 sur 2. », « X est polie : usure 1 sur 2. »,
    « Pointe, vide : sans effet. ») et des retraits qu'une Fêlure provoque, avec leur
    Final ;
@@ -2075,7 +2075,7 @@ sac et de la défausse : `marbles/view/keywords.js`) :
 
 - **E** : une seule annonce, « Éveil : se déclenche quand la bille est piochée. Final : … » ;
 - **Maj+E** : un menu vertical (`lib/menu.js`), titré « Mots-clés de géante », une entrée par
-  mot-clé (« Pioche : pioche des billes du sac. … »), puis « Fermer » ; Échap ferme aussi.
+  mot-clé (« Piocher : pioche des billes du sac. … »), puis « Fermer » ; Échap ferme aussi.
   Les entrées se lisent, Entrée n'y fait rien.
 
 Seulement les mots-clés présents sur la bille (`marbles/core/content.js`/`keywordsOf`,
