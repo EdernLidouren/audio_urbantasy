@@ -193,6 +193,7 @@ const FILTER_TEXTS = {
   size: (filter) => ({ key: "marbles.target.all_size", params: { size: sizeRef(filter.size) } }),
   family: (filter) => ({ key: "marbles.target.all_family", params: { family: familyRef(filter.family) } }),
   rarity: (filter) => ({ key: "marbles.target.all_rarity", params: { rarity: rarityRef(filter.rarity) } }),
+  marble: (filter) => ({ key: "marbles.target.all_marble", params: { marble: marbleRef(filter.marble) } }),
 };
 for (const type of Object.keys(TARGET_FILTERS)) {
   if (!Object.hasOwn(FILTER_TEXTS, type)) throw new Error(`marbles : le filtre de cible "${type}" doit avoir son texte (FILTER_TEXTS).`);
@@ -377,6 +378,56 @@ export function describeOutcome(outcome, t) {
 
 // Le texte de chaque condition (marbles/core/effects.js/CONDITIONS), lu dans une
 // fiche après « si » : « si la bille éjectée est plus petite ».
+// Une condition niée (`not`, marbles/core/effects.js/conditionHolds) : le
+// paramètre `not` de son gabarit, "yes" ou "no".
+const negation = (when) => (when.not === true ? "yes" : "no");
+
+// Une borne de comparaison (`atLeast`, `atMost`) : { bound, count }.
+const boundParams = (when) => (when.atLeast !== undefined ? { bound: "atLeast", count: when.atLeast } : { bound: "atMost", count: when.atMost });
+
+// Le texte d'une condition « count » par sorte de source (AMOUNT_SOURCES) :
+// « vous avez au plus 3 billes en main », « le pot compte au moins 3 abeilles ».
+// Une source sans texte échoue au chargement. Le nom compté se dit avec son nombre
+// (`marbles.condition.count.noun`, un par sorte de filtre).
+const COUNT_TEXTS = {
+  zoneCount: (source, bound, t) => {
+    const [filter] = source.filters ?? [];
+    const names = filter === undefined ? {} : FILTER_REFS[filter.type](filter);
+    const noun = t(`marbles.condition.count.noun${filter === undefined ? "" : `_${filter.type}`}`, { count: bound.count, ...names });
+    return t(`marbles.condition.count.zone.${source.zone}`, { bound: bound.bound, noun });
+  },
+  familyCount: (source, bound, t) => t("marbles.condition.count.families", bound),
+  tally: (source, bound, t) =>
+    t("marbles.condition.count.tally", {
+      ...bound,
+      scope: source.scope,
+      unit: nameRef(`marbles.tally.${source.tally}.unit`),
+      name: nameRef(`marbles.tally.${source.tally}.name`),
+    }),
+  turnsInHand: (source, bound, t) => t("marbles.condition.count.turns_in_hand", bound),
+};
+for (const type of new Set([...Object.keys(AMOUNT_SOURCES), ...Object.keys(COUNT_TEXTS)])) {
+  if (!Object.hasOwn(AMOUNT_SOURCES, type) || !Object.hasOwn(COUNT_TEXTS, type)) throw new Error(`marbles : la source "${type}" doit avoir son texte de condition (COUNT_TEXTS).`);
+}
+
+// Les références de nom d'un filtre, pour un nom compté.
+const FILTER_REFS = {
+  size: (filter) => ({ size: sizeRef(filter.size) }),
+  family: (filter) => ({ family: familyRef(filter.family) }),
+  rarity: (filter) => ({ rarity: rarityRef(filter.rarity) }),
+  marble: (filter) => ({ marble: marbleRef(filter.marble) }),
+};
+for (const type of Object.keys(TARGET_FILTERS)) {
+  if (!Object.hasOwn(FILTER_REFS, type)) throw new Error(`marbles : le filtre "${type}" doit avoir ses références de nom (FILTER_REFS).`);
+}
+
+// Le texte d'une condition qui lit un emplacement, fixe (`<clé>`, {slot}) ou relatif
+// (`<clé>_relative`, {relative}).
+function slotConditionText(key, when, params, t) {
+  if (isRelative(when.slot)) return t(`${key}_relative`, { relative: relativeWord(when.slot), ...params });
+  return t(key, { slot: slotName(when.slot, t), ...params });
+}
+
 const CONDITION_TEXTS = {
   printedStat: (when, t) => {
     const effect = combined(valueParts({ [when.stat]: when.atLeast }, t), t);
@@ -384,20 +435,19 @@ const CONDITION_TEXTS = {
     return t("marbles.condition.printedStat", { slot: slotName(when.slot, t), effect });
   },
   relativeSize: (when, t) => t("marbles.condition.relativeSize", { marble: when.marble, is: when.is }),
-  sizeAt: (when, t) =>
-    isRelative(when.slot)
-      ? t("marbles.condition.sizeAt_relative", { relative: relativeWord(when.slot), size: sizeRef(when.size) })
-      : t("marbles.condition.sizeAt", { slot: slotName(when.slot, t), size: sizeRef(when.size) }),
+  sizeAt: (when, t) => slotConditionText("marbles.condition.sizeAt", when, { size: sizeRef(when.size), not: negation(when) }, t),
   // L'état d'une zone : un texte par zone et par état déclaré.
   zone: (when, t) => t(`marbles.condition.zone.${when.zone}.${when.state}`),
-  familyAt: (when, t) =>
-    isRelative(when.slot)
-      ? t("marbles.condition.familyAt_relative", { relative: relativeWord(when.slot), family: familyRef(when.family) })
-      : t("marbles.condition.familyAt", { slot: slotName(when.slot, t), family: familyRef(when.family) }),
-  rarityAt: (when, t) =>
-    isRelative(when.slot)
-      ? t("marbles.condition.rarityAt_relative", { relative: relativeWord(when.slot), rarity: rarityRef(when.rarity) })
-      : t("marbles.condition.rarityAt", { slot: slotName(when.slot, t), rarity: rarityRef(when.rarity) }),
+  familyAt: (when, t) => slotConditionText("marbles.condition.familyAt", when, { family: familyRef(when.family), not: negation(when) }, t),
+  rarityAt: (when, t) => slotConditionText("marbles.condition.rarityAt", when, { rarity: rarityRef(when.rarity), not: negation(when) }, t),
+  marbleAt: (when, t) => slotConditionText("marbles.condition.marbleAt", when, { marble: marbleRef(when.marble), not: negation(when) }, t),
+  slotIs: (when, t) => slotConditionText("marbles.condition.slotIs", when, { state: when.state }, t),
+  replacementSize: (when, t) => t("marbles.condition.replacementSize", { marble: when.marble, size: sizeRef(when.size), not: negation(when) }),
+  count: (when, t) => COUNT_TEXTS[when.source.type](when.source, boundParams(when), t),
+  stat: (when, t) => {
+    const { bound, count } = boundParams(when);
+    return t("marbles.condition.stat", { stat: when.stat, bound, value: formatCounter(count) });
+  },
 };
 
 // Une condition sans texte, ou un texte sans condition, échoue au chargement.
@@ -452,6 +502,13 @@ export function cardSituation(marble, turnsInHand = 0, tally = emptyTally(TALLY_
 // actuelle dans `situation`), sa cible et sa condition comprises. Son action dit sa
 // valeur par ses propres textes.
 function describeClause(clause, situation, t, statuses) {
+  const text = describeBranch(clause, situation, t, statuses);
+  if (clause.otherwise === undefined) return text;
+  return t("marbles.effect.otherwise", { effect: text, otherwise: describeClause(clause.otherwise, situation, t, statuses) });
+}
+
+// Une branche de clause, sans sa chaîne de remplacement (describeClause).
+function describeBranch(clause, situation, t, statuses) {
   // Un statut se dit d'après sa définition (la table des statuts) ; une action sans
   // montant (Empocher) dit sa cible elle-même.
   const status = CLAUSE_ACTIONS[clause.action].kind === "status";

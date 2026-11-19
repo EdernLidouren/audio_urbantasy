@@ -8,7 +8,7 @@
 
 import { BAG_BUILD_RULES, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import { isMarbleFamily, isMarbleRarity, isMarbleSize, validateEffect, validateFilters } from "./effects.js";
+import { clauseBranches, isMarbleFamily, isMarbleRarity, isMarbleSize, referencedMarbles, validateEffect, validateFilters } from "./effects.js";
 import { EFFECT_FIELDS, FIXED_MOMENTS, LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, TALLY_IDS, pocketClauses, reactionClauses } from "./content.js";
 import { CHARACTERISTICS, LOCKS, MODIFIER_OPERATIONS, MODIFIER_POINTS, NO_STATUSES, STATUS_BEHAVIORS, STATUS_DURATIONS, STATUS_STACKINGS } from "./statuses.js";
 import { BAG_SOURCES, GOALS, START_KEYS } from "./definitions.js";
@@ -95,13 +95,26 @@ export function validateMarbleTypes(types, statuses = NO_STATUSES) {
     // ne lit jamais ; son existence se vérifie à l'audit du contenu.
     if (type.beacon !== undefined && (typeof type.beacon !== "string" || type.beacon === "")) fail(`bille "${id}" : beacon doit être une clé de son non vide.`);
   }
+  // Les billes CITÉES (une condition sur une bille précise, un filtre « bille ») par
+  // les billes et par les statuts : la table doit les contenir. Les statuts se valident
+  // avant la table (validateMarbleStatuses) : leur citation se vérifie ici, où les deux
+  // sont connues.
+  const cited = [
+    ...Object.entries(types).map(([id, type]) => [`bille "${id}"`, type]),
+    ...Object.entries(statuses).map(([id, definition]) => [`statut "${id}"`, definition.behaviors]),
+  ];
+  for (const [where, data] of cited) {
+    for (const marble of referencedMarbles(data)) {
+      if (!Object.hasOwn(types, marble)) fail(`${where} : cite la bille inconnue "${marble}".`);
+    }
+  }
 }
 
 // La boucle directe : réagir au déclenchement d'une action qu'on produit soi-même
 // (« à chaque polissage : Polissage 1 ») se relancerait sans fin. Une bille du pot
 // comme un statut.
 function rejectDirectLoop(effect, key, describe, fail) {
-  if (COUNTER_CATEGORIES[key] === "action" && effect.some((clause) => clause.action === key)) {
+  if (COUNTER_CATEGORIES[key] === "action" && effect.flatMap(clauseBranches).some((clause) => clause.action === key)) {
     fail(`${describe} : réagit à « ${key} » en le produisant, une boucle sans fin.`);
   }
 }

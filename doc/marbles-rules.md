@@ -308,14 +308,23 @@ Une action qui vise un emplacement peut viser, au lieu d'un emplacement fixe, l'
 
 ### Les conditions
 
-Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien. Six sortes de conditions existent :
+Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien, ou joue son remplacement si elle en a un (« sinon », plus bas). Les sortes de conditions :
 
 - **l'effet imprimé d'une autre bille** : la bille d'un emplacement donne au moins une certaine valeur, à cet emplacement. Seul compte ce qui est imprimé sur la bille, jamais un effet déjà modifié ;
 - **le calibre relatif**, pendant un remplacement seulement : la bille posée ou la bille chassée est plus petite, ou plus grosse, que l'autre. Quand c'est un effet Éjecter qui chasse, la bille qui éjecte tient le rôle de la bille posée, où qu'elle soit ;
 - **le calibre d'un emplacement** : la bille d'un emplacement est d'un calibre donné. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est un calot » ;
 - **la famille d'un emplacement** : la bille d'un emplacement est d'une famille donnée, parmi d'autres peut-être. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est de la famille Brume » ;
 - **la rareté d'un emplacement** : la bille d'un emplacement est d'une rareté donnée, exactement. L'emplacement peut être relatif : « si la pointe est une bille rare » ;
+- **une bille précise sur un emplacement** : la bille d'un emplacement est une bille donnée. L'emplacement peut être relatif : « si la bille de l'emplacement précédent est une abeille » ;
+- **un emplacement vide ou occupé**, fixe ou relatif : « si l'emplacement suivant est vide ». Un emplacement relatif sans référence n'est ni vide ni occupé : la condition est fausse ;
+- **le calibre d'une bille d'un remplacement**, pendant un remplacement seulement : la bille éjectée, ou celle qui l'éjecte (la bille posée, ou la bille d'un effet Éjecter), est d'un calibre donné. « Tic : Vitesse +4 si la bille éjectée est une minibille. », « Éjection : Empocher cette bille si la bille qui l'éjecte est un calot. » ;
+- **un nombre comparé à une borne**, au moins ou au plus : le nombre de billes d'une zone, filtré ou non, le nombre de familles différentes sur le triangle, une valeur de partie, les tours en main de la bille, les mêmes nombres que les montants calculés (plus bas). « si vous avez au plus 3 billes en main », « si le pot compte au moins 3 abeilles », « si cette partie compte au moins 2 éveils » ;
+- **la Vitesse ou la Masse du tour**, comparée à une borne, telle qu'elle est quand l'effet joue, avant ce qu'il produit : « si la Vitesse est d'au moins 10 », « si la Masse est d'au plus 1 » ;
 - **l'état d'une zone de la partie** : le triangle est plein, vide, ou n'a qu'une bille ; la main est vide, ou pleine ; le sac est vide ; la défausse est vide ; le pot est plein, ou vide. « Pleine » et « plein » se comparent aux caractéristiques en vigueur : la taille de la main, la capacité du pot. Une bille en transit (en cours de lancer, en partance) n'est dans aucune zone et ne compte nulle part : pendant sa Chiquenaude, la bille lancée n'est plus en main ; pendant son Éjection, la bille chassée n'est plus sur le triangle. « Pointe : Vitesse +6 si le triangle est plein. », « Tic : Pioche 1 si la main est vide. », « En poche, à chaque résolution : Masse +2 si le pot est plein. ».
+
+Les conditions sur la bille d'un emplacement (son calibre, sa famille, sa rareté, une bille précise) et le calibre d'une bille d'un remplacement peuvent se **nier** : « si la bille de l'emplacement suivant n'est pas de la famille Bestiaire ». Un emplacement vide n'a ni calibre, ni famille, ni rareté : la condition niée y est vraie.
+
+**Sinon** : une clause qui porte une condition peut porter un remplacement, joué à sa place quand la condition est fausse : « Base : Vitesse +3 si le triangle compte au moins 1 calot, sinon Vitesse +1. ». Le remplacement peut avoir lui-même sa condition et son remplacement, une chaîne : seule la première clause dont la condition est vraie, ou la dernière, sans condition, joue. « Tic : Vitesse +3 si la bille éjectée est un calot, sinon Vitesse +2 si la bille éjectée est une bille normale, sinon Vitesse +1. ». Les deux branches peuvent faire des choses différentes : « Trouvaille : Empocher la bille de l'emplacement suivant si l'emplacement suivant est occupé, sinon Empocher cette bille. ».
 
 ### Les montants calculés
 
@@ -323,7 +332,7 @@ Un montant peut dépendre du moment, par exemple « Vitesse +1 par minibille act
 
 - **les tours en main** de la bille elle-même ;
 - **une valeur de partie**, ce tour ou cette partie (section 10) ;
-- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues ; toutes, ou seulement celles d'un calibre, d'une famille ou d'une rareté (« par minibille active », « par Brume à la défausse », « par bille rare en main »). Une bille active compte, la bille elle-même comprise si elle est sur le triangle ; une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » ;
+- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues ; toutes, ou seulement celles d'un calibre, d'une famille, d'une rareté, ou une bille précise (« par minibille active », « par Brume à la défausse », « par bille rare en main », « par abeille dans le pot »). Une bille active compte, la bille elle-même comprise si elle est sur le triangle ; une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » ;
 - **le nombre de familles différentes** parmi les billes actives : chaque famille compte une fois, Classiques comprises ; une bille à plusieurs familles compte pour chacune ; une bille en transit ne compte pas. « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. ».
 
 Un montant qui vaut 0 ne produit rien.

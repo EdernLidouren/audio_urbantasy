@@ -77,10 +77,16 @@
 //           la défausse, les prochaines du sac). Pour une Vitesse ou une Masse, un
 //           emplacement donne un bonus à sa phase (jamais une phase toujours passée,
 //           ni dans un Final) ;
-//   when    (facultatif) sa condition, évaluée au déclenchement (calibre d'un
-//           emplacement, calibre relatif d'un remplacement, état d'une zone, effet
-//           imprimé). Une condition lit toujours l'effet IMPRIMÉ d'une bille, jamais
-//           un effet déjà modifié : aucune dépendance circulaire n'est possible.
+//   when    (facultatif) sa condition, évaluée au déclenchement (calibre, famille,
+//           rareté ou bille précise d'un emplacement, emplacement vide ou occupé,
+//           calibre d'une bille d'un remplacement, état d'une zone, un nombre comparé
+//           à une borne, la Vitesse ou la Masse du tour, effet imprimé), niée par
+//           not(…) quand elle l'accepte. Une condition lit toujours l'effet IMPRIMÉ
+//           d'une bille, jamais un effet déjà modifié : aucune dépendance circulaire
+//           n'est possible ;
+//   otherwise (facultatif, avec `when`) la clause jouée à sa place quand la condition
+//           est fausse, « …, sinon … » : orElse(clause, condition, autre clause) ; une
+//           chaîne, chaque clause pouvant avoir son propre sinon.
 //
 // Le nom d'une bille se déduit de son id : `marble.<id>.name`
 // (data/i18n/<langue>/marbles.json), vérifié par les vérifications

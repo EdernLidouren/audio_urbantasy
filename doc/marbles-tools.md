@@ -276,7 +276,10 @@ résultat rendu à l'hôte, emplacements et magasins, point d'entrée, gestion d
 joueur et ses refus, relecture d'un sac abîmé, menu du choix du sac),
 `marbles-pocket` (le pot), `marbles-path` (le chemin des billes : la Chute,
 Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de billes par
-zone), `marbles-families` (familles et raretés : validation, filtres, conditions
+zone), `marbles-conditions` (le sinon, la négation, la bille précise et son filtre,
+l'emplacement vide ou occupé, le calibre d'une bille d'un remplacement, un nombre comparé à
+une borne, les compteurs du tour, et leurs textes dans chaque vraie langue),
+`marbles-families` (familles et raretés : validation, filtres, conditions
 d'emplacement, nombre de billes filtré, familles différentes, leurs textes et la touche
 F), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :
 définitions, cumuls, caractéristiques, modificateurs, filtres de source et arrondi,

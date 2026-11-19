@@ -155,7 +155,7 @@
 
 import { MARBLES_SETTINGS, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TALLIES, MARBLE_TRIGGERS } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
-import { CLAUSE_ACTIONS, effectAt } from "./effects.js";
+import { CLAUSE_ACTIONS, clauseBranches, effectAt } from "./effects.js";
 import { SLOTS } from "./zones.js";
 import { buildTallyCounters } from "./counters.js";
 
@@ -399,7 +399,7 @@ function clausesOf(type) {
     ...EFFECT_FIELDS.flatMap((field) => type[field] ?? []),
     ...Object.values(type.baseVariant ?? {}).flat(),
     ...Object.values(type[MARBLE_POCKET.field] ?? {}).flat(),
-  ];
+  ].flatMap(clauseBranches);
 }
 
 // Les MOTS-CLÉS, dans l'ordre de l'aide : les déclencheurs (MARBLE_TRIGGERS), En

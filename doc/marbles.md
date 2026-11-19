@@ -620,17 +620,26 @@ Tic ou une Éjection, le remplacement en cours.
 | `{ type: "sizeAt", slot, size }` (`sizeAt(slot, calibre)`) | la bille de `slot` est de calibre `size` ; emplacement vide : faux | « Base : Éjecter la bille de l'emplacement suivant si la bille de l'emplacement suivant est une minibille. » (tornade) |
 | `{ type: "familyAt", slot, family }` (`familyAt(slot, famille)`) | la bille de `slot` est de la famille `family`, parmi d'autres peut-être ; emplacement vide : faux | « si la bille de l'emplacement suivant est de la famille Brume » |
 | `{ type: "rarityAt", slot, rarity }` (`rarityAt(slot, rareté)`) | la bille de `slot` est de rareté `rarity`, exactement ; emplacement vide : faux | « si la pointe est une bille rare » |
+| `{ type: "marbleAt", slot, marble }` (`marbleAt(slot, id)`) | la bille de `slot` est la bille `marble` (un id ; la table des billes vérifie qu'il existe, `referencedMarbles`) ; emplacement vide : faux | « Pointe : Empocher cette bille si la bille de l'emplacement précédent est une abeille, sinon Vitesse +3. » |
+| `{ type: "slotIs", slot, state }` (`slotIs(slot, état)`) | l'emplacement `slot` est `empty` (vide) ou `occupied` (occupé) ; un emplacement relatif sans référence n'est ni l'un ni l'autre : faux | « Base : Polissage 1 à la bille de l'emplacement suivant ; Vitesse −2 si l'emplacement suivant est vide. » |
+| `{ type: "replacementSize", marble, size }` (`replacementSize(bille, calibre)`) | pendant un remplacement, la bille `marble` (`ejected`, l'éjectée, ou `placed`, celle qui l'éjecte : la posée, ou la bille d'un effet Éjecter) est de calibre `size` ; sans bille (un statut qui éjecte) : faux | « Tic : Vitesse +4 si la bille éjectée est une minibille. », « Éjection : Empocher cette bille si la bille qui l'éjecte est un calot. » |
+| `{ type: "count", source, atLeast \| atMost }` (`count(source, { atLeast })`) | la valeur de `source`, une source de montant (`AMOUNT_SOURCES` : `zoneCount`, `familyCount`, `tally`, `turnsInHand`), est au moins `atLeast` ou au plus `atMost` (une borne exactement, un entier) ; son texte, par sorte de source (`COUNT_TEXTS` de la vue, une source sans texte échoue au chargement) | « si vous avez au plus 3 billes en main », « si le pot compte au moins 3 abeilles » |
+| `{ type: "stat", stat, atLeast \| atMost }` (`statIs(compteur, { atMost })`) | le compteur du tour `stat` (`speed`, `mass`), tel qu'il est au déclenchement, avant l'effet qui le lit, respecte la borne | « Base : Masse +1 si la Vitesse est d'au moins 10, sinon Vitesse +2. » |
 | `{ type: "zone", zone, state }` (`zoneIs(zone, état)`) | la zone de la partie `zone` est dans l'état `state` au déclenchement (`ZONE_STATES` : `empty`, aucune bille ; `single`, une seule ; `full`, autant que sa capacité en vigueur, taille de main ou capacité du pot) ; chaque zone déclare ses états (`GAME_ZONES`, `states`), un autre est refusé au chargement ; une bille en transit ne compte nulle part | « Base : Polissage 1 à la bille de l'emplacement suivant si le triangle est plein. » (tortue), « En poche, à chaque résolution : Masse +1 si le pot est plein. » (lingotin) |
+
+**La négation** : `not: true` (forme courte `not(condition)`) sur une condition qui le déclare (`negatable` : `sizeAt`, `familyAt`, `rarityAt`, `marbleAt`, `replacementSize`) ; refusée ailleurs au chargement. La condition niée est vraie quand son test est faux, emplacement vide compris (« n'est pas de la famille Bestiaire »). Ses textes reçoivent `{not}` (`yes`, `no`). Le test passe par `conditionHolds`, jamais par `CONDITIONS[…].test` seul.
+
+**Sinon** : une clause qui a une condition peut porter `otherwise`, une autre clause, jouée à sa place quand la condition est fausse (forme courte `orElse(clause, condition, remplacement)`) ; le remplacement peut avoir sa condition et son `otherwise`, une chaîne dont seule la première branche vraie (ou la dernière, sans condition) joue (`evaluateEffect`, `playingBranch`). Chaque branche se valide comme une clause du même champ, au même moment (`otherwise` sans `when` est refusé) ; ce qui cherche ce qu'une bille sait faire lit toutes les branches (`clauseBranches` : ses mots-clés, ses statuts, la boucle directe d'une réaction) ; les cibles relatives se traduisent dans toute la chaîne (`resolveClauses`). Le texte : « {effect}, sinon {otherwise} » (`marbles.effect.otherwise`).
 
 Les ZONES DE LA PARTIE (`marbles/core/zones.js`/`GAME_ZONES`) se déclarent une fois, avec
 leurs billes (`marbles`, d'où se tire leur nombre, `zoneCount`), leur capacité éventuelle
 et leurs états ; ajouter une zone ou un état : une
 entrée et ses textes (`marbles.condition.zone.<zone>.<état>`, `marbles.effect.per_zone`).
 La situation d'un effet porte l'état de la partie (`state`), d'où elles se comptent. Le
-`slot` de `printedStat`, `sizeAt`, `familyAt` et `rarityAt` peut être une cible relative
+`slot` de `printedStat`, `sizeAt`, `familyAt`, `rarityAt`, `marbleAt` et `slotIs` peut être une cible relative
 (voir « La règle des cibles ») ; sans référence, la condition est fausse.
 
-`relativeSize` n'existe que pendant un remplacement : la validation la refuse hors d'un champ
+`relativeSize` et `replacementSize` n'existent que pendant un remplacement : la validation les refuse hors d'un champ
 de déclencheur marqué `replacement` dans `MARBLE_TRIGGERS` (le Tic, vu par la posée ;
 l'Éjection, vue par l'éjectée).
 
@@ -743,12 +752,17 @@ une ou plusieurs billes actives du triangle par un effet, sans pose. Sa cible :
 
 **Les filtres de cible**, déclarés une fois (`TARGET_FILTERS`, sur le modèle des
 conditions : champs, validation, test) : une cible « toutes » porte `filters`, une liste ;
-une bille doit les passer TOUS ; un même type de filtre une seule fois. Aujourd'hui, le
-calibre seul : `{ type: "size", size }` (forme courte `sizeIs(SMALL)`). Ajouter un filtre
-(la matière…) : une entrée dans `TARGET_FILTERS` et son texte dans
-`marbles/view/narration/effects.js`/`FILTER_TEXTS` (un filtre sans texte fait échouer le
-chargement). Les textes ne combinent pas encore deux filtres : le jour où un second type
-existera, sa phrase combinée s'écrira avec lui.
+une bille doit les passer TOUS ; un seul filtre à la fois aujourd'hui. Quatre sortes : le
+calibre (`sizeIs(SMALL)`), la famille (`familyIs`), la rareté (`rarityIs`) et une bille
+précise (`marbleIs("bee")`, `{ type: "marble", marble }` : la table des billes vérifie
+que l'id existe, chez une bille comme chez un statut, `referencedMarbles`). Ajouter un
+filtre : une entrée dans `TARGET_FILTERS`, ses noms (`FILTER_NAMES`) et ses textes dans la
+vue (`FILTER_TEXTS`, `FILTER_REFS` de `marbles/view/narration/effects.js`,
+`SOURCE_FILTER_TEXTS` de `marbles/view/narration/statuses.js`) ; un filtre sans texte fait
+échouer le chargement. Un filtre dont le nom porte le genre (le calibre, une bille
+précise, `GENDERED_FILTERS`) a son gabarit à lui sur le triangle (« par abeille
+active »). Les textes ne combinent pas encore deux filtres : le jour où deux seront
+permis ensemble, leur phrase combinée s'écrira avec eux.
 
 **Déroulé**, pour chaque bille B chassée par une bille A (`marbles/core/path.js`/`ejectFromSlot`) :
 

@@ -318,7 +318,7 @@ function checkCards(run) {
     );
     // Les conditions de calibre, lisibles à l'oreille.
     run("fiche : comptage par calibre", "card.base{effect: effect.combined{parts: [effect.per_zone_size_triangle{effect: effect.combined{parts: [effect.speed_up{amount: 1}]}, zone: triangle, size: <size.small.name>}]}}", fields("size_count").above[1]);
-    run("fiche : calibre d'un emplacement", "card.apex{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]} | effect.conditional{effect: effect.combined{parts: [effect.mass_up{amount: 2}]}, condition: condition.sizeAt{slot: slot.leftBase, size: <size.large.name>}}]}}", fields("final_pocket").above[0]);
+    run("fiche : calibre d'un emplacement", "card.apex{effect: effect.combined{parts: [effect.combined{parts: [effect.mass_up{amount: 1}]} | effect.conditional{effect: effect.combined{parts: [effect.mass_up{amount: 2}]}, condition: condition.sizeAt{slot: slot.leftBase, size: <size.large.name>, not: no}}]}}", fields("final_pocket").above[0]);
     run.same("fiche : un Polissage au choix au Tic", [
       "card.hit{effect: effect.combined{parts: [effect.given_choice{effect: effect.combined{parts: [effect.polish{amount: 1}]}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}",
     ], fields("hit_polish").below);

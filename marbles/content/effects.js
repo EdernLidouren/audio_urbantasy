@@ -53,6 +53,35 @@ export const sizeAt = (slot, size) => ({ type: "sizeAt", slot, size });
 export const familyAt = (slot, family) => ({ type: "familyAt", slot, family });
 export const rarityAt = (slot, rarity) => ({ type: "rarityAt", slot, rarity });
 
+// La bille d'un emplacement est la bille `marble` (un id), une condition (`when`) :
+// marbleAt(PREVIOUS_SLOT, "bee"), « si la bille de l'emplacement précédent est une
+// abeille ».
+export const marbleAt = (slot, marble) => ({ type: "marbleAt", slot, marble });
+
+// LA NÉGATION d'une condition qui l'accepte (sizeAt, familyAt, rarityAt, marbleAt,
+// replacementSize) : not(familyAt(NEXT_SLOT, "bestiary")), « si la bille de
+// l'emplacement suivant n'est pas de la famille Bestiaire ».
+export const not = (condition) => ({ ...condition, not: true });
+
+// L'état d'un emplacement, "empty" ou "occupied", une condition (`when`) :
+// slotIs(NEXT_SLOT, "empty"), « si l'emplacement suivant est vide ».
+export const slotIs = (slot, state) => ({ type: "slotIs", slot, state });
+
+// Pendant un remplacement (Tic, Éjection), le calibre de la bille éjectée ("ejected")
+// ou de celle qui l'éjecte ("placed"), une condition (`when`) :
+// replacementSize("ejected", SMALL), « si la bille éjectée est une minibille ».
+export const replacementSize = (marble, size) => ({ type: "replacementSize", marble, size });
+
+// Un NOMBRE comparé à une borne, une condition (`when`) : la valeur d'une source de
+// montant (zoneCount, familyCount, tally, turnsInHand) au moins (`atLeast`) ou au plus
+// (`atMost`) : count(zoneCount("hand"), { atMost: 3 }), « si vous avez au plus 3
+// billes en main ».
+export const count = (source, bound) => ({ type: "count", source, ...bound });
+
+// Un COMPTEUR DU TOUR ("speed", "mass") comparé à une borne, une condition (`when`) :
+// statIs("speed", { atLeast: 10 }), « si la Vitesse est d'au moins 10 ».
+export const statIs = (stat, bound) => ({ type: "stat", stat, ...bound });
+
 // La première bille de la main, cible d'Empocher et de Défausser
 // (marbles/core/effects.js/FIRST_IN_HAND).
 export const FIRST_IN_HAND = "firstInHand";
@@ -96,6 +125,14 @@ export const allActive = (...filters) => ({ type: "all", ...(filters.length === 
 export const sizeIs = (size) => ({ type: "size", size });
 export const familyIs = (family) => ({ type: "family", family });
 export const rarityIs = (rarity) => ({ type: "rarity", rarity });
+// Une bille précise, par son id : zoneCount("pot", marbleIs("bee")), « par abeille
+// dans le pot ».
+export const marbleIs = (marble) => ({ type: "marble", marble });
+
+// SINON : `clause` si `condition`, sinon `fallback` (une clause, qui peut avoir son
+// propre sinon) : orElse(speed(3), count(...), speed(1)), « Vitesse +3 si …, sinon
+// Vitesse +1 » (marbles/core/effects.js, en-tête « Sinon »).
+export const orElse = (clause, condition, fallback) => ({ ...clause, when: condition, otherwise: fallback });
 
 // Éjecter : chasse du triangle la bille elle-même (sans cible, sur le triangle
 // seulement), celle d'un emplacement, des billes au choix (choice) ou toutes les

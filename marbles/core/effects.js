@@ -60,6 +60,13 @@
 // (règle des cibles, conditions) et `tallies`, les identifiants des valeurs de
 // partie (marbles/core/content.js les fournit), que vérifie la source `tally`.
 //
+// SINON : une clause qui a une condition (`when`) peut porter `otherwise`, une autre
+// clause, jouée À SA PLACE quand la condition est fausse : « Vitesse +3 si une autre
+// bille active est un calot, sinon Vitesse +1 ». La clause de remplacement peut avoir
+// sa propre condition et son propre `otherwise` : une chaîne, dont seule la première
+// branche vraie (ou la dernière, sans condition) joue. Chaque branche se valide comme
+// une clause du même champ (clauseBranches les énumère).
+//
 // MONTANT CALCULÉ : `amount` est un entier, ou { base, step, source, max? } :
 // base + step × la valeur de `source` (AMOUNT_SOURCES), plafonné à `max` s'il est
 // donné, évalué au déclenchement (amountOf). Le seul mécanisme d'un montant qui
@@ -294,6 +301,16 @@ export const TARGET_FILTERS = {
       validateRarity(filter.rarity, describe, fail);
     },
     test: (filter, marble, types) => types[marble].rarity === filter.rarity,
+  },
+  // La bille est la bille `marble` (un id de la table des billes) : « par abeille dans
+  // le pot ». L'id existe-t-il ? La table des billes le vérifie au chargement
+  // (marbles/core/validation.js, referencedMarbles), une clause ne la connaissant pas.
+  marble: {
+    fields: ["type", "marble"],
+    validate(filter, describe, fail) {
+      validateMarbleId(filter.marble, describe, fail);
+    },
+    test: (filter, marble) => marble === filter.marble,
   },
 };
 
@@ -682,6 +699,38 @@ function validateConditionSlot(slot, describe, fail, context) {
 // comparée à l'autre.
 const REPLACEMENT_MARBLES = { ejected: "placed", placed: "ejected" };
 
+// Un id de bille : une chaîne non vide (son existence se vérifie avec la table des
+// billes, marbles/core/validation.js).
+function validateMarbleId(marble, describe, fail) {
+  if (typeof marble !== "string" || marble === "") fail(`${describe} : bille inconnue "${marble}".`);
+}
+
+// Une condition NIABLE (`not: true`, facultatif) : vraie quand son test est faux,
+// « si la bille de l'emplacement suivant n'est pas de la famille Bestiaire ». Les
+// conditions qui le déclarent (`negatable`) l'acceptent, les autres le refusent.
+function validateNot(when, describe, fail) {
+  if (when.not !== undefined && when.not !== true) fail(`${describe} : not vaut true, ou s'omet.`);
+}
+
+// Une BORNE, celle des conditions qui comparent un nombre : exactement une de
+// `atLeast` (au moins) et `atMost` (au plus), un entier.
+function validateBound(when, describe, fail) {
+  const bounds = ["atLeast", "atMost"].filter((bound) => when[bound] !== undefined);
+  if (bounds.length !== 1) fail(`${describe} : une borne, atLeast ou atMost, exactement.`);
+  if (!Number.isInteger(when[bounds[0]])) fail(`${describe} : ${bounds[0]} doit être un entier.`);
+}
+
+// Un nombre respecte-t-il la borne d'une condition ?
+function withinBound(value, when) {
+  return when.atLeast !== undefined ? value >= when.atLeast : value <= when.atMost;
+}
+
+// Les COMPTEURS DU TOUR qu'une condition lit (stat) : la Vitesse et la Masse.
+const TURN_STATS = Object.freeze(["speed", "mass"]);
+
+// Les ÉTATS D'UN EMPLACEMENT (slotIs) : vide, occupé.
+const SLOT_STATES = { empty: (placed) => placed === null, occupied: (placed) => placed !== null };
+
 
 // La zone d'une condition ou d'une source : une zone déclarée.
 function validateZone(zone, describe, fail) {
@@ -743,9 +792,11 @@ export const CONDITIONS = {
       return ZONE_STATES[when.state].test(zoneCount(when.zone, state), GAME_ZONES[when.zone].capacity?.(state, statuses));
     },
   },
-  // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non.
+  // La bille à `slot` est-elle de calibre `size` ? Emplacement vide : non. Niable :
+  // « n'est pas un calot » (emplacement vide : vrai, il n'y a pas de calot).
   sizeAt: {
-    fields: ["type", "slot", "size"],
+    fields: ["type", "slot", "size", "not"],
+    negatable: true,
     validate(when, describe, fail, context) {
       validateConditionSlot(when.slot, describe, fail, context);
       validateSize(when.size, describe, fail);
@@ -758,7 +809,8 @@ export const CONDITIONS = {
   // La bille à `slot` est-elle de la famille `family` (parmi d'autres peut-être) ?
   // Emplacement vide : non.
   familyAt: {
-    fields: ["type", "slot", "family"],
+    fields: ["type", "slot", "family", "not"],
+    negatable: true,
     validate(when, describe, fail, context) {
       validateConditionSlot(when.slot, describe, fail, context);
       validateFamily(when.family, describe, fail);
@@ -770,7 +822,8 @@ export const CONDITIONS = {
   },
   // La bille à `slot` est-elle de rareté `rarity`, exactement ? Emplacement vide : non.
   rarityAt: {
-    fields: ["type", "slot", "rarity"],
+    fields: ["type", "slot", "rarity", "not"],
+    negatable: true,
     validate(when, describe, fail, context) {
       validateConditionSlot(when.slot, describe, fail, context);
       validateRarity(when.rarity, describe, fail);
@@ -780,7 +833,109 @@ export const CONDITIONS = {
       return placed !== null && types[placed.marble].rarity === when.rarity;
     },
   },
+  // La bille à `slot` est-elle la bille `marble` (un id) ? « si la bille de
+  // l'emplacement précédent est une abeille ». Emplacement vide : non. Niable.
+  marbleAt: {
+    fields: ["type", "slot", "marble", "not"],
+    negatable: true,
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
+      validateMarbleId(when.marble, describe, fail);
+    },
+    test(when, { triangle }) {
+      const placed = triangle[when.slot] ?? null;
+      return placed !== null && placed.marble === when.marble;
+    },
+  },
+  // L'emplacement `slot` est-il dans l'état `state` (SLOT_STATES : "empty",
+  // "occupied") ? « si l'emplacement suivant est vide ». Un emplacement relatif sans
+  // référence n'est ni l'un ni l'autre : faux.
+  slotIs: {
+    fields: ["type", "slot", "state"],
+    validate(when, describe, fail, context) {
+      validateConditionSlot(when.slot, describe, fail, context);
+      if (!Object.hasOwn(SLOT_STATES, when.state)) fail(`${describe} : état d'emplacement inconnu "${when.state}" (${Object.keys(SLOT_STATES).join(", ")}).`);
+    },
+    test(when, { triangle }) {
+      if (!SLOTS.includes(when.slot)) return false;
+      return SLOT_STATES[when.state](triangle[when.slot] ?? null);
+    },
+  },
+  // Pendant un remplacement : la bille `marble` ("ejected", l'éjectée, ou "placed",
+  // celle qui l'éjecte : la posée, ou la bille d'un effet Éjecter) est-elle de calibre
+  // `size` ? « Tic : Vitesse +4 si la bille éjectée est une minibille », « Éjection :
+  // Empocher cette bille si la bille qui l'éjecte est un calot ». Sans bille (un statut
+  // qui éjecte) : faux. Niable. Comme relativeSize, dans un Tic ou une Éjection
+  // seulement.
+  replacementSize: {
+    fields: ["type", "marble", "size", "not"],
+    negatable: true,
+    validate(when, describe, fail, context) {
+      if (!Object.hasOwn(REPLACEMENT_MARBLES, when.marble)) fail(`${describe} : bille de remplacement inconnue "${when.marble}".`);
+      validateSize(when.size, describe, fail);
+      if (context.replacement !== true) fail(`${describe} : replacementSize ne vaut que pendant un remplacement (Tic, Éjection).`);
+    },
+    test(when, { replacement }, types) {
+      const subject = replacement?.[when.marble] ?? null;
+      return subject !== null && types[subject].size === when.size;
+    },
+  },
+  // Un NOMBRE comparé à une borne (validateBound) : la valeur d'une source de montant
+  // (AMOUNT_SOURCES), « si vous avez au plus 3 billes en main », « si le pot compte au
+  // moins 3 abeilles », « si le triangle compte au moins 3 familles différentes ».
+  count: {
+    fields: ["type", "source", "atLeast", "atMost"],
+    validate(when, describe, fail, context) {
+      validateRule(when.source, AMOUNT_SOURCES, "source", `${describe}, nombre`, fail, context);
+      validateBound(when, describe, fail);
+    },
+    test(when, situation, types) {
+      return withinBound(AMOUNT_SOURCES[when.source.type].value(when.source, situation, types), when);
+    },
+  },
+  // Un COMPTEUR DU TOUR (TURN_STATS), au déclenchement, avant l'effet qui le lit,
+  // comparé à une borne : « si la Masse est d'au plus 1 », « si la Vitesse est d'au
+  // moins 10 ».
+  stat: {
+    fields: ["type", "stat", "atLeast", "atMost"],
+    validate(when, describe, fail) {
+      if (!TURN_STATS.includes(when.stat)) fail(`${describe} : compteur du tour inconnu "${when.stat}" (${TURN_STATS.join(", ")}).`);
+      validateBound(when, describe, fail);
+    },
+    test(when, { state }) {
+      return state !== null && state !== undefined && withinBound(state[when.stat], when);
+    },
+  },
 };
+
+// Une condition est-elle vraie dans la situation, sa négation comprise (`not`) ?
+export function conditionHolds(when, situation, types) {
+  return CONDITIONS[when.type].test(when, situation, types) !== (when.not === true);
+}
+
+// Les BRANCHES d'une clause : elle, puis chaque clause de sa chaîne de remplacement
+// (`otherwise`, voir l'en-tête « Sinon »), dans l'ordre. Ce qui cherche ce qu'une
+// bille sait faire (ses mots-clés, ses statuts, une boucle) les lit toutes.
+export function clauseBranches(clause) {
+  return clause.otherwise === undefined ? [clause] : [clause, ...clauseBranches(clause.otherwise)];
+}
+
+// La branche d'une clause qui JOUE dans la situation : la première dont la condition
+// est vraie, ou qui n'en a pas ; aucune (null) si toutes sont fausses.
+function playingBranch(clause, situation, types) {
+  if (clause.when === undefined || conditionHolds(clause.when, situation, types)) return clause;
+  return clause.otherwise === undefined ? null : playingBranch(clause.otherwise, situation, types);
+}
+
+// Les BILLES CITÉES par des données d'effet (une condition marbleAt, un filtre
+// "marble", où qu'ils soient : condition, cible, montant, chaîne de remplacement),
+// que la table des billes doit contenir (marbles/core/validation.js).
+export function referencedMarbles(data) {
+  if (Array.isArray(data)) return data.flatMap(referencedMarbles);
+  if (data === null || typeof data !== "object") return [];
+  const own = (data.type === "marbleAt" || data.type === "marble") && typeof data.marble === "string" ? [data.marble] : [];
+  return [...own, ...Object.values(data).flatMap(referencedMarbles)];
+}
 
 // Chaque SOURCE d'un montant calculé (en-tête), déclarée ICI ET NULLE PART AILLEURS :
 //   fields    ses champs ;
@@ -828,8 +983,9 @@ export const AMOUNT_SOURCES = {
     },
     value: (source, { state }, types) => GAME_ZONES[source.zone].marbles(state).filter((marble) => passesFilters(marble, source.filters, types)).length,
     // Un gabarit par type de filtre, `marbles.effect.per_zone_<filtre>` ; le calibre a
-    // le sien sur le triangle (« par calot actif » : l'accord suit le calibre).
-    text: (source) => (source.filters === undefined ? "marbles.effect.per_zone" : `marbles.effect.per_zone_${source.filters[0].type}${source.filters[0].type === "size" && source.zone === "triangle" ? "_triangle" : ""}`),
+    // le sien sur le triangle (« par calot actif » : l'accord suit le calibre), comme
+    // une bille précise (« par abeille active ») : GENDERED_FILTERS.
+    text: (source) => (source.filters === undefined ? "marbles.effect.per_zone" : `marbles.effect.per_zone_${source.filters[0].type}${GENDERED_FILTERS.has(source.filters[0].type) && source.zone === "triangle" ? "_triangle" : ""}`),
     params: (source) => ({ zone: source.zone }),
     names: (source) => (source.filters === undefined ? {} : FILTER_NAMES[source.filters[0].type](source.filters[0])),
     current: true,
@@ -865,12 +1021,17 @@ export const AMOUNT_SOURCES = {
 };
 
 
+// Les filtres dont le nom porte le genre (le calibre, une bille précise) : sur le
+// triangle, « actif » ou « active » s'accorde avec lui, un gabarit à part.
+const GENDERED_FILTERS = new Set(["size", "marble"]);
+
 // Les NOMS d'un filtre, pour le gabarit d'un nombre de billes filtré : { param: clé
 // i18n }, dont la vue fait des références de nom (`names` des sources).
 const FILTER_NAMES = {
   size: (filter) => ({ size: `marbles.size.${MARBLE_SIZES[filter.size]}.name` }),
   family: (filter) => ({ family: `marbles.family.${filter.family}.name` }),
   rarity: (filter) => ({ rarity: `marbles.rarity.${filter.rarity}.name` }),
+  marble: (filter) => ({ marble: `marble.${filter.marble}.name` }),
 };
 for (const type of Object.keys(TARGET_FILTERS)) {
   if (!Object.hasOwn(FILTER_NAMES, type)) throw new Error(`marbles : le filtre "${type}" doit avoir ses noms (FILTER_NAMES).`);
@@ -968,7 +1129,15 @@ export function validateEffect(effect, describe, fail, context = {}) {
   for (const clause of effect) {
     const action = CLAUSE_ACTIONS[clause.action];
     if (!Object.hasOwn(CLAUSE_ACTIONS, clause.action)) fail(`${describe} : action inconnue "${clause.action}".`);
-    rejectUnknownFields(clause, action.fields, describe, fail);
+    // Sinon : seulement après une condition ; la clause de remplacement se valide
+    // comme une clause du même champ.
+    const { otherwise, ...own } = clause;
+    if (otherwise !== undefined) {
+      if (clause.when === undefined) fail(`${describe} : otherwise demande une condition (when).`);
+      if (otherwise === null || typeof otherwise !== "object" || Array.isArray(otherwise)) fail(`${describe} : otherwise est une clause.`);
+      validateEffect([otherwise], `${describe}, sinon`, fail, context);
+    }
+    rejectUnknownFields(own, action.fields, describe, fail);
     action.validate(clause, describe, fail, context);
     if (isChoice(clause.target)) validateChoice(clause, action, describe, fail);
     else if (isAll(clause.target)) validateAll(clause, action, describe, fail);
@@ -977,7 +1146,10 @@ export function validateEffect(effect, describe, fail, context = {}) {
     else if (clause.target !== undefined && !(action.targets ?? SLOTS).includes(clause.target)) fail(`${describe} : cible inconnue "${clause.target}".`);
     const problem = targetProblem(clause, context);
     if (problem !== null) fail(`${describe} : ${problem}.`);
-    if (clause.when !== undefined) validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
+    if (clause.when !== undefined) {
+      validateRule(clause.when, CONDITIONS, "condition", describe, fail, context);
+      validateNot(clause.when, describe, fail);
+    }
   }
 }
 
@@ -991,12 +1163,16 @@ export const NO_REFERENCE = "noReference";
 // conditions. Une cible relative sans référence devient NO_REFERENCE ; une condition
 // sur un emplacement relatif sans référence est fausse.
 export function resolveClauses(clauses, reference) {
-  return clauses.map((clause) => {
-    let next = clause;
-    if (clause.when?.slot !== undefined && isRelative(clause.when.slot)) next = { ...next, when: { ...clause.when, slot: resolveRelative(clause.when.slot, reference) } };
-    if (isRelative(clause.target)) next = { ...next, target: resolveRelative(clause.target, reference) ?? NO_REFERENCE };
-    return next;
-  });
+  return clauses.map((clause) => resolveClause(clause, reference));
+}
+
+// Une clause, et sa chaîne de remplacement (`otherwise`), traduites (resolveClauses).
+function resolveClause(clause, reference) {
+  let next = clause;
+  if (clause.when?.slot !== undefined && isRelative(clause.when.slot)) next = { ...next, when: { ...clause.when, slot: resolveRelative(clause.when.slot, reference) } };
+  if (isRelative(clause.target)) next = { ...next, target: resolveRelative(clause.target, reference) ?? NO_REFERENCE };
+  if (clause.otherwise !== undefined) next = { ...next, otherwise: resolveClause(clause.otherwise, reference) };
+  return next;
 }
 
 // Évalue des clauses dans une SITUATION (en-tête), au moment du déclenchement :
@@ -1010,14 +1186,16 @@ export function resolveClauses(clauses, reference) {
 //               une cible relative sans référence, sans effet) ; un statut :
 //               [{ action, status, amount, duration, stacking }]
 //               (marbles/core/statuses.js/statusApplication).
-// Une clause dont la condition échoue, ou dont le montant (calculé s'il l'est) vaut
-// zéro, ne produit rien. Seules les valeurs finales en sortent.
+// Une clause dont la condition échoue joue sa clause de remplacement (`otherwise`), ou
+// rien ; une clause dont le montant (calculé s'il l'est) vaut zéro ne produit rien.
+// Seules les valeurs finales en sortent.
 export function evaluateEffect(clauses, situation, types) {
   let self = ZERO;
   const gifts = [];
   const operations = [];
-  for (const printed of clauses) {
-    if (printed.when !== undefined && !CONDITIONS[printed.when.type].test(printed.when, situation, types)) continue;
+  for (const written of clauses) {
+    const printed = playingBranch(written, situation, types);
+    if (printed === null) continue;
     const { kind, apply, amountless } = CLAUSE_ACTIONS[printed.action];
     // Une action sans montant (Empocher) s'applique telle quelle.
     const amount = amountless ? undefined : amountOf(printed.amount, situation, types);
