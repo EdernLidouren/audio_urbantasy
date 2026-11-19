@@ -160,6 +160,12 @@ export const rarityIs = (rarity) => ({ type: "rarity", rarity });
 // dans le pot ».
 export const marbleIs = (marble) => ({ type: "marble", marble });
 
+// UNE CONDITION POUR PLUSIEURS CLAUSES : les clauses, chacune avec cette condition,
+// en une liste (un champ d'effet entier, ou à étaler dans un autre) :
+// conditioned(count(…), speed(7), mass(2)), « Vitesse +7 et Masse +2 si … ». Les mêmes
+// données qu'en l'écrivant sur chaque clause ; la fiche dit la condition une fois.
+export const conditioned = (condition, ...clauses) => clauses.map((clause) => ({ ...clause, when: condition }));
+
 // SINON : `clause` si `condition`, sinon `fallback` (une clause, qui peut avoir son
 // propre sinon) : orElse(speed(3), count(...), speed(1)), « Vitesse +3 si …, sinon
 // Vitesse +1 » (marbles/core/effects.js, en-tête « Sinon »).

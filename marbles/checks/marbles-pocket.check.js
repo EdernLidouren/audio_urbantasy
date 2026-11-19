@@ -365,14 +365,15 @@ function checkPocketReactions(run) {
   run("validation, réaction : mot-clé accepté", true, valid({ final: speed1 }));
   run("validation, réaction : moment fixe d'En poche accepté", true, valid({ pocketEntry: speed1 }));
   run("validation, réaction : action acceptée", true, valid({ crack: speed1 }));
-  run("validation, réaction : quantité réelle refusée", false, valid({ polishQuantity: speed1 }));
+  run("validation, réaction : quantité de points (usure rendue) refusée", false, valid({ polishQuantity: speed1 }));
+  run("validation, réaction : quantité de billes (billes piochées par une pioche) acceptée", true, valid({ drawQuantity: speed1 }));
   run("validation, réaction : gains de Vitesse refusés", false, valid({ speedGains: speed1 }));
   run("validation, réaction : total de Masse refusé", false, valid({ massGained: speed1 }));
   run("validation, réaction : réagir aux réactions refusé", false, valid({ pocketReaction: speed1 }));
   run("validation, réaction : clé inconnue refusée", false, valid({ nope: speed1 }));
   run("validation, réaction : sur elle-même refusé", false, valid({ flick: [{ action: "polish", amount: 1 }] }));
   run("validation, réaction : une action ciblée acceptée", true, valid({ flick: [{ action: "polish", amount: 1, target: "apex" }] }));
-  run("validation, réaction : le message dit pourquoi", true, /ne s'écoute pas/.test(caughtMessage(() => validateTable({ x: { pocketed: { drawQuantity: speed1 } } }))));
+  run("validation, réaction : le message dit pourquoi", true, /ne s'écoute pas/.test(caughtMessage(() => validateTable({ x: { pocketed: { crackQuantity: speed1 } } }))));
 
   // Boucle directe : réagir au déclenchement d'une action qu'on produit, refusé.
   run("validation, boucle directe : à chaque polissage, Polissage 1, refusé", false, valid({ polish: [{ action: "polish", amount: 1, target: "apex" }] }));

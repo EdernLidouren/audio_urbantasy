@@ -15,7 +15,7 @@ import { NEXT_SLOT, allActive, applyStatus, bounce, crack, eject, mass, polish, 
 import { validateMarbleTriggers } from "../core/content.js";
 import { throwsLeft } from "../core/marbles.js";
 import { marbleCard } from "../view/card.js";
-import { fabricatedRules, forecastMatches, inHand, keyText as t, marblesPlayState, mustReduce, placed } from "./helpers.js";
+import { fabricatedRules, forecastMatches, inHand, keyText as t, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
 export default function checkMarblesReactions(run) {
   run.section("Polissage reçu", checkPolished);
@@ -91,8 +91,11 @@ function checkDeclaration(run) {
   run("déclaration : atLeast non entier refusé", true, throws(withPolished({ atLeast: { applied: "un" } })));
 }
 
-// LES COMPTEURS PAR BILLE : chacun compte une bille, et le pot les écoute bille par
-// bille.
+// LES COMPTEURS PAR BILLE : les quantités de billes d'une action (billes déplacées par
+// rebond, chassées par effet), écoutables, et l'évènement des billes normales ou calots
+// éjectés ; le pot y réagit bille par bille. Une quantité de points (l'usure rendue)
+// ne s'écoute pas, et une réaction qui produirait l'action qu'elle écoute, par sa
+// quantité, est une boucle refusée.
 function checkMarbleTallies(run) {
   const table = {
     plain: {},
@@ -101,8 +104,8 @@ function checkMarbleTallies(run) {
     globe: { hit: [bounce(allActive())] },
     // Tic : Éjecter toutes les billes actives.
     blower: { hit: [eject(allActive())] },
-    // En poche, à chaque bille renvoyée par un rebond : Masse +1.
-    keeper: { pocketed: { bouncedMarbles: [mass(1)] } },
+    // En poche, à chaque bille déplacée par rebond : Masse +1.
+    keeper: { pocketed: { bounceQuantity: [mass(1)] } },
   };
   const rules = fabricatedRules(table);
   const place = (marble, triangle, over = {}) => mustReduce(rules, marblesPlayState(rules, { hand: inHand([marble]), triangle, ...over }), { type: "place", handIndex: 0, slot: "apex" });
@@ -110,15 +113,18 @@ function checkMarbleTallies(run) {
   // globe posée en pointe : la délogée est en partance ; le Tic renvoie les deux bases
   // et le globe lui-même (toutes les billes actives).
   const bounced = place("globe", full, { pot: ["keeper"] });
-  run.same("billes renvoyées par un rebond : trois, et le pot réagit à chacune", { bouncedMarbles: 3, mass: 4 }, { bouncedMarbles: bounced.state.tally.bouncedMarbles.game, mass: bounced.state.mass });
+  run.same("billes déplacées par rebond : trois, et le pot réagit à chacune", { bounceQuantity: 3, mass: 4 }, { bounceQuantity: bounced.state.tally.bounceQuantity.game, mass: bounced.state.mass });
   const crowded = place("globe", full, { hand: inHand(["globe", "plain", "plain", "plain", "plain"]), handSize: 5 });
-  run("billes renvoyées par un rebond : main pleine, comptées aussi", 3, crowded.state.tally.bouncedMarbles.game);
+  run("billes déplacées par rebond : main pleine, comptées aussi", 3, crowded.state.tally.bounceQuantity.game);
   const blown = place("blower", full);
   run.same(
-    "billes éjectées par un effet : les deux bases et elle-même, pas la délogée par la pose ; normales ou calots : la délogée et les deux normales",
-    { effectEjectedMarbles: 3, ejectedMarbles: 4, ejectedBigMarbles: 3 },
-    { effectEjectedMarbles: blown.state.tally.effectEjectedMarbles.game, ejectedMarbles: blown.state.tally.ejectedMarbles.game, ejectedBigMarbles: blown.state.tally.ejectedBigMarbles.game }
+    "billes chassées par effet : les deux bases et elle-même, pas la délogée par la pose ; normales ou calots : la délogée et les deux normales",
+    { ejectQuantity: 3, ejectedMarbles: 4, ejectedBigMarbles: 3 },
+    { ejectQuantity: blown.state.tally.ejectQuantity.game, ejectedMarbles: blown.state.tally.ejectedMarbles.game, ejectedBigMarbles: blown.state.tally.ejectedBigMarbles.game }
   );
+  run("quantité de points : l'usure rendue ne s'écoute pas", true, throws(() => validateTable({ x: { pocketed: { polishQuantity: [mass(1)] } } })));
+  run("boucle : réagir aux billes déplacées par rebond en faisant un Rebond, refusé", true, throws(() => validateTable({ x: { pocketed: { bounceQuantity: [bounce("apex")] } } })));
+  run("quantité de billes : écouter les billes piochées par une pioche, permis", false, throws(() => validateTable({ x: { pocketed: { drawQuantity: [mass(1)] } } })));
 }
 
 // UN LANCER RENDU : une Chiquenaude qui donne « lancers +1, ce tour » ; le lancer de la

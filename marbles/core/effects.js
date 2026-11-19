@@ -384,7 +384,10 @@ function addAmount(values, clause) {
 //             chargement échoue, marbles/core/content.js) ; ses valeurs de partie
 //             (marbles/core/counters.js) : `triggers(event)`, ce qu'un évènement du
 //             journal ajoute à ses déclenchements ; `quantity(event)` (facultatif),
-//             à sa quantité réelle. Une action de valeur sans mot-clé (Vitesse,
+//             à sa quantité réelle ; `marbleQuantity` (facultatif, true) : cette
+//             quantité compte des billes, une par bille, et le pot peut l'écouter
+//             (« à chaque bille déplacée par rebond ») ; sinon elle compte des
+//             points (l'usure rendue ou ajoutée), que rien n'écoute. Une action de valeur sans mot-clé (Vitesse,
 //             Masse) a ses gains et ses pertes.
 // Le `kind` "marble" : une action sur une bille. Ses textes :
 // marbles/view/narration/effects.js/ACTION_TEXTS.
@@ -435,6 +438,8 @@ export const CLAUSE_ACTIONS = {
     apply: addAmount,
     keyword: {
       texts: { name: "marbles.keyword.draw.name", description: "marbles.keyword.draw.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) => (event.type === "effect" && event.draw > 0 ? 1 : 0),
       quantity: (event) => (event.type === "draw" && event.cause === "effect" ? 1 : 0),
     },
@@ -492,6 +497,8 @@ export const CLAUSE_ACTIONS = {
     selfZones: ["triangle", "hand", "leaving", "discard"],
     keyword: {
       texts: { name: "marbles.keyword.pocket.name", description: "marbles.keyword.pocket.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) =>
         ((event.type === "pocketed" || event.type === "lost") && event.redirected !== true) ||
         (event.type === "redirected" && event.action === "pocket") ||
@@ -521,6 +528,8 @@ export const CLAUSE_ACTIONS = {
     selfZones: ON_TRIANGLE,
     keyword: {
       texts: { name: "marbles.keyword.eject.name", description: "marbles.keyword.eject.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) => (event.type === "eject" || (event.type === "targetEmpty" && event.action === "eject") ? 1 : 0),
       quantity: (event) => (event.type === "removed" && event.cause === "eject" ? 1 : 0),
     },
@@ -550,6 +559,8 @@ export const CLAUSE_ACTIONS = {
     selfZones: ["triangle", "hand"],
     keyword: {
       texts: { name: "marbles.keyword.discard.name", description: "marbles.keyword.discard.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) => ((event.type === "discarded" && event.cause === "discard") || (event.type === "targetEmpty" && event.action === "discard") ? 1 : 0),
       quantity: (event) => (event.type === "discarded" && event.cause === "discard" ? 1 : 0),
     },
@@ -578,6 +589,8 @@ export const CLAUSE_ACTIONS = {
     selfZones: ["triangle", "leaving"],
     keyword: {
       texts: { name: "marbles.keyword.bounce.name", description: "marbles.keyword.bounce.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) => (movedArrival(event, "bounce") && event.redirected !== true) || (event.type === "redirected" && event.action === "bounce") || (event.type === "targetEmpty" && event.action === "bounce") ? 1 : 0,
       quantity: (event) => (movedArrival(event, "bounce") ? 1 : 0),
     },
@@ -603,6 +616,8 @@ export const CLAUSE_ACTIONS = {
     selfZones: [],
     keyword: {
       texts: { name: "marbles.keyword.retrieve.name", description: "marbles.keyword.retrieve.description" },
+      // Sa quantité compte des BILLES (une par bille) : le pot peut l'écouter.
+      marbleQuantity: true,
       triggers: (event) => movedArrival(event, "retrieve") || (event.type === "targetEmpty" && event.action === "retrieve") ? 1 : 0,
       quantity: (event) => (movedArrival(event, "retrieve") ? 1 : 0),
     },

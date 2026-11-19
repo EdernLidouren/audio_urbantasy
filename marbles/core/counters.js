@@ -39,10 +39,12 @@
 // ÉCOUTABLE (`listenable`) : une bille du pot peut réagir à chacun de ses incréments
 // (En poche, à chaque (occurrence) : marbles/config/values.js/MARBLE_POCKET). Le
 // sont les évènements réels, les déclenchements de mots-clés (déclencheurs, phases,
-// moments fixes d'En poche) et ceux des actions. Ne le sont pas : les quantités
-// réelles et Vitesse et Masse (« stat »), qui comptent des points plutôt que des
-// occurrences, ni les réactions elles-mêmes (un moment déclaré non écoutable), qui
-// se répondraient sans fin. Un compteur ajouté d'une catégorie écoutable l'est par
+// moments fixes d'En poche) et ceux des actions, et les quantités réelles qui
+// comptent des billes (billes piochées, empochées, chassées, défaussées, renvoyées,
+// ramassées : une réaction par bille). Ne le sont pas : les quantités de points
+// (l'usure rendue ou ajoutée) et Vitesse et Masse (« stat »), qui comptent des points
+// plutôt que des occurrences, ni les réactions elles-mêmes (un moment déclaré non
+// écoutable), qui se répondraient sans fin. Un compteur ajouté d'une catégorie écoutable l'est par
 // construction.
 
 import { effectAt, isMarbleSize } from "./effects.js";
@@ -117,10 +119,12 @@ function pocketMomentCounter({ id, event: eventType, clauses, listenable }) {
 }
 
 // Une action mot-clé : `keyword.triggers`, ses déclenchements ; `keyword.quantity`
-// (facultatif), sa quantité réelle.
+// (facultatif), sa quantité réelle, écoutable si elle compte des billes
+// (`keyword.marbleQuantity`). Chacun porte son action (`action`), que lit le garde-fou
+// contre les boucles (marbles/core/validation.js).
 function actionCounters(id, { keyword }) {
-  const counters = [{ id, category: "action", listenable: true, count: keyword.triggers }];
-  if (keyword.quantity) counters.push({ id: `${id}Quantity`, category: "action", listenable: false, count: keyword.quantity });
+  const counters = [{ id, category: "action", action: id, listenable: true, count: keyword.triggers }];
+  if (keyword.quantity) counters.push({ id: `${id}Quantity`, category: "action", action: id, listenable: keyword.marbleQuantity === true, count: keyword.quantity });
   return counters;
 }
 

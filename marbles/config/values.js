@@ -596,13 +596,9 @@ export const MARBLE_TALLIES = [
   // Chaque bille chassée du triangle : par un remplacement (une pose), ou par
   // l'action Éjecter.
   { id: "ejectedMarbles", events: ["removed"], match: { cause: ["replacement", "eject"] } },
-  // Chaque bille chassée du triangle par l'action Éjecter (jamais par une pose).
-  { id: "effectEjectedMarbles", events: ["removed"], match: { cause: "eject" } },
   // Chaque bille normale ou calot chassé du triangle, par une pose ou par Éjecter.
   { id: "ejectedBigMarbles", events: ["removed"], match: { cause: ["replacement", "eject"] }, filter: { type: "size", size: [MEDIUM, LARGE] } },
-  // Chaque bille déplacée par un Rebond : arrivée en main, ou à la défausse, main
-  // pleine.
-  { id: "bouncedMarbles", events: ["returned", "discarded"], match: { movedBy: "bounce" } },
+
   // Chaque régénération du sac depuis la défausse.
   { id: "shuffles", events: ["bagRegenerated"] },
   // Chaque bille piochée, pioche du tour comme effets.

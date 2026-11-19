@@ -261,10 +261,16 @@ poche », et section 12, « Les réactions des statuts ».
   (`marbles/core/content.js`/`REACTION_KEYS`), sans autre liste à tenir. Le sont, par
   catégorie (`marbles/core/counters.js`, `listenable`) : les évènements réels déclarés
   (`MARBLE_TALLIES`), les déclenchements de mots-clés (déclencheurs, phases, moments
-  fixes d'En poche) et ceux des actions mots-clés. Ne le sont pas, refusés au chargement
-  avec leur raison : les quantités réelles (`<action>Quantity`) et Vitesse et Masse
-  (`speedGains`…), qui comptent des points plutôt que des occurrences, et les réactions
-  elles-mêmes (`pocketReaction`), qui se répondraient sans fin. Un compteur ajouté d'une
+  fixes d'En poche) et ceux des actions mots-clés, et les quantités réelles qui
+  comptent des BILLES (`<action>Quantity` d'une action qui déclare `marbleQuantity` :
+  Pioche, Empocher, Éjecter, Défausser, Rebond, Ramasser ; une réaction par bille,
+  « à chaque bille déplacée par rebond »). Ne le sont pas, refusés au chargement avec
+  leur raison : les quantités de points (`polishQuantity`, `crackQuantity`, l'usure
+  rendue ou ajoutée) et Vitesse et Masse (`speedGains`…), qui comptent des points plutôt
+  que des occurrences, et les réactions elles-mêmes (`pocketReaction`), qui se
+  répondraient sans fin. Le garde-fou contre les boucles lit l'action d'un compteur
+  d'action (`action`), sa quantité comprise : réagir aux billes déplacées par rebond en
+  faisant un Rebond est refusé. Un compteur ajouté d'une
   catégorie écoutable devient écoutable par construction. Attention aux deux sens d'un
   même mot : `flick`, la Chiquenaude, ne compte que chez une bille qui en a une ; « à
   chaque bille lancée » est `thrownMarbles`.
@@ -605,7 +611,7 @@ actif ») ; le nom du filtre lui vient de `FILTER_NAMES`. En français, une fami
 lieu du mot « bille », accordée au féminin : « par Astres active », « par Brume à la
 défausse » ; une rareté qualifie « bille » : « par bille rare en main ». À l'aveugle (la
 prévision), une bille cachée (au sac, ou piochée) ne passe aucun filtre : un nombre
-filtré des billes du sac ne se prévoit pas (`doc/marbles-backlog.md`).
+filtré des billes du sac ne se prévoit pas (`doc/marbles-backlog.md`) : une source qui lit l'identité d'une bille cachée (un filtre, une famille) le signale (`onHiddenRead` de la situation), et la prévision se dit incertaine (`hiddenRead`, « Selon des billes encore cachées. »).
 
 Chaque source est déclarée UNE fois, dans `marbles/core/effects.js`/`AMOUNT_SOURCES` :
 ses champs et leur validation, sa valeur dans la situation (`value`), son gabarit (`text`,

@@ -1,6 +1,6 @@
 // Bille « galaxie » (galaxy). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, mass, zoneCount, count, familyIs } from "../effects.js";
+import { speed, mass, zoneCount, count, familyIs, conditioned } from "../effects.js";
 import { MEDIUM } from "../../config/values.js";
 
 export default {
@@ -9,10 +9,7 @@ export default {
   base: [mass(1)],
   // Chiquenaude : Vitesse +5 et Masse +1 si au moins deux emplacements sont vides :
   // le triangle compte au plus une bille (la galaxie, en cours de lancer, n'y est pas).
-  flick: [
-    { ...speed(5), when: count(zoneCount("triangle"), { atMost: 1 }) },
-    { ...mass(1), when: count(zoneCount("triangle"), { atMost: 1 }) },
-  ],
+  flick: conditioned(count(zoneCount("triangle"), { atMost: 1 }), speed(5), mass(1)),
   windfall: [mass(1)],
   size: MEDIUM,
   families: ["stars"],

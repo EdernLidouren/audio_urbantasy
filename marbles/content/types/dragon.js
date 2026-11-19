@@ -1,6 +1,6 @@
 // Bille « dragon » (dragon). Donnée pure : les champs sont décrits dans
 // marbles/content/types/index.js.
-import { speed, mass, pocket, zoneCount, wear, count, familyIs, KNOCKED_OUT } from "../effects.js";
+import { speed, mass, pocket, zoneCount, wear, count, familyIs, conditioned, KNOCKED_OUT } from "../effects.js";
 import { LARGE } from "../../config/values.js";
 
 export default {
@@ -10,11 +10,7 @@ export default {
   base: [speed({ base: 0, step: 1, source: zoneCount("hand"), max: 3 })],
   // Tic : si la bille éjectée était à un point de son usure maximale, Vitesse +7,
   // Masse +2, et Empocher la bille éjectée (en partance, redirigée vers le pot).
-  hit: [
-    { ...speed(7), when: count(wear({ marble: "ejected", remaining: true }), { atMost: 1 }) },
-    { ...mass(2), when: count(wear({ marble: "ejected", remaining: true }), { atMost: 1 }) },
-    { ...pocket(KNOCKED_OUT), when: count(wear({ marble: "ejected", remaining: true }), { atMost: 1 }) },
-  ],
+  hit: conditioned(count(wear({ marble: "ejected", remaining: true }), { atMost: 1 }), speed(7), mass(2), pocket(KNOCKED_OUT)),
   // En poche, à chaque tic : Masse +1.
   pocketed: { hit: [mass(1)] },
   maxWear: 4,

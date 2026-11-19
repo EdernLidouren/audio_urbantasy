@@ -16,7 +16,8 @@ import { NO_BAGS, validateBuildRules, validatePresetBags } from "./bags.js";
 
 // La catégorie de chaque valeur de partie (marbles/core/counters.js), que lit le
 // garde-fou des boucles directes.
-const COUNTER_CATEGORIES = Object.fromEntries(TALLY_COUNTERS.map((counter) => [counter.id, counter.category]));
+// L'action de chaque compteur d'action (ses déclenchements comme sa quantité réelle).
+const COUNTER_ACTIONS = Object.fromEntries(TALLY_COUNTERS.filter((counter) => counter.category === "action").map((counter) => [counter.id, counter.action]));
 
 // Le moment où joue chaque champ d'effet, pour la règle des cibles et les
 // conditions qui n'ont de sens qu'à certains moments (marbles/core/effects.js/
@@ -114,7 +115,7 @@ export function validateMarbleTypes(types, statuses = NO_STATUSES) {
 // (« à chaque polissage : Polissage 1 ») se relancerait sans fin. Une bille du pot
 // comme un statut.
 function rejectDirectLoop(effect, key, describe, fail) {
-  if (COUNTER_CATEGORIES[key] === "action" && effect.flatMap(clauseBranches).some((clause) => clause.action === key)) {
+  if (Object.hasOwn(COUNTER_ACTIONS, key) && effect.flatMap(clauseBranches).some((clause) => clause.action === COUNTER_ACTIONS[key])) {
     fail(`${describe} : réagit à « ${key} » en le produisant, une boucle sans fin.`);
   }
 }

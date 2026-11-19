@@ -88,6 +88,8 @@
 //           not(…) quand elle l'accepte. Une condition lit toujours l'effet IMPRIMÉ
 //           d'une bille, jamais un effet déjà modifié : aucune dépendance circulaire
 //           n'est possible ;
+//           Une même condition sur plusieurs clauses : conditioned(condition,
+//           ...clauses), qui la recopie sur chacune ;
 //   otherwise (facultatif, avec `when`) la clause jouée à sa place quand la condition
 //           est fausse, « …, sinon … » : orElse(clause, condition, autre clause) ; une
 //           chaîne, chaque clause pouvant avoir son propre sinon.

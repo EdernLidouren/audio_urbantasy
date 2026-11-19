@@ -383,7 +383,7 @@ Une action dont la cible est vide ne fait rien, et le journal le dit : un emplac
 Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche, à chaque chiquenaude : Vitesse +2 ».
 
 - Elle peut écouter un évènement de la partie, le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action : les valeurs de partie de ces trois catégories (section 10, « Les catégories »).
-- Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes. Pour réagir à chaque bille plutôt qu'à chaque action, elle écoute un évènement : « à chaque bille renvoyée par un rebond », « à chaque bille éjectée par un effet », « à chaque éjection d'une bille normale ou d'un calot ».
+- Elle écoute aussi une quantité qui compte des billes, une réaction par bille, pour réagir à chaque bille plutôt qu'à chaque action : « à chaque bille déplacée par rebond », « à chaque bille chassée par effet », « à chaque bille piochée par une pioche ». Elle n'écoute jamais une quantité de points (l'usure rendue ou ajoutée), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
 - **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour une Pioche d'effet, pour un retrait à l'étape des retraits comme pour un retrait par une Fêlure. Une bille perdue au pot plein suit cet ordre comme toute arrivée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
 - **Une seule exception, les phases de la résolution** : ce qu'elles font réagir (une phase de base, un Polissage, une pioche…) attend la fin de la phase de pointe. À l'étape du pot, chaque bille joue ses réactions retenues, puis son effet à chaque résolution, avant la bille suivante ; puis les statuts jouent les leurs. Une abeille au pot ne se fait donc entendre qu'après la pointe, deux fois si les deux bases ont joué.
@@ -410,7 +410,7 @@ Les valeurs de partie sont des compteurs tenus pendant la partie. Les montants c
 - **Les déclenchements de mots-clés** : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, pointe, base, base droite, base gauche, et les effets En poche (entrée, résolution, réactions).
 - **Les actions** : pour chaque mot-clé d'action, ses déclenchements, et sa quantité réelle (billes piochées, usure rendue ou ajoutée, billes déplacées au pot, billes chassées, billes défaussées, renvoyées en main, ramassées).
 - **Vitesse et Masse** : les gains et les pertes, en nombre et en total.
-- **Les évènements** : billes lancées, tiquées, éjectées, éjectées par un effet, billes normales et calots éjectés, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne), renvoyées par un rebond (en main, ou à la défausse, main pleine) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
+- **Les évènements** : billes lancées, tiquées, éjectées, billes normales et calots éjectés, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
 
 ### Les règles de comptage
 
@@ -850,7 +850,7 @@ boule à neige, normale, Brume, légendaire, usure 3.
 - Pointe : Vitesse +4 et Rebond de toutes les billes actives.
 - Base : Vitesse +2.
 - Éjection : Masse +2.
-- En poche, à chaque bille renvoyée par un rebond : Masse +1.
+- En poche, à chaque bille déplacée par rebond : Masse +1.
 
 ### abeille
 
@@ -943,7 +943,7 @@ tornade, normale, Souffle, rare, usure 3.
 - Base : Empocher cette bille si le triangle compte au moins 2 calots, sinon Vitesse +3.
 - Tic : Rebond de la bille éjectée si la bille éjectée n'est pas un calot.
 - Éjection : Pioche 1.
-- En poche, à chaque bille éjectée par un effet : Vitesse +2.
+- En poche, à chaque bille chassée par effet : Vitesse +2.
 
 ### grenade
 

@@ -12,8 +12,8 @@ export default {
   // Tic : Rebond de la bille éjectée si elle n'est pas un calot.
   hit: [{ ...bounce(KNOCKED_OUT), when: not(replacementSize("ejected", LARGE)) }],
   knockout: [draw(1)],
-  // En poche, à chaque bille éjectée par un effet : Vitesse +2.
-  pocketed: { effectEjectedMarbles: [speed(2)] },
+  // En poche, à chaque bille chassée par un effet : Vitesse +2.
+  pocketed: { ejectQuantity: [speed(2)] },
   size: MEDIUM,
   families: ["blast"],
   rarity: "rare",
