@@ -487,7 +487,9 @@ function checkChoiceModes(run) {
     placeOnApex(optional);
     run("facultatif : la question dit ce qu'on peut faire, puis T pour ne rien choisir", true, optional.said.at(-1).includes("choice.question.optional{") && optional.said.at(-1).endsWith("choice.decline_hint"));
     optional.key("End");
-    run("facultatif : « Ne rien choisir » en fin de menu", "choice.decline. menu.position{index: 3, total: 3}", optional.said.at(-1));
+    // La défausse au Tic : la plain d'avant la pose ; la délogée, en partance, n'y
+    // est pas encore.
+    run("facultatif : « Ne rien choisir » en fin de menu", "choice.decline. menu.position{index: 2, total: 2}", optional.said.at(-1));
     optional.key("Escape");
     for (let pulse = 0; pulse < 5; pulse++) optional.advance(LONG_MS);
     run("facultatif : Échap, plus de choix en attente", null, optional.game().pendingChoice);

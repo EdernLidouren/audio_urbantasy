@@ -7,7 +7,8 @@
 
 import { throws } from "../../lib/check.js";
 import { LARGE, SMALL } from "../config/values.js";
-import { fabricatedRules, forecastMatches, inHand, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
+import { marbleCard } from "../view/card.js";
+import { fabricatedRules, forecastMatches, inHand, keyText as t, marbleCount, marblesPlayState, mustReduce, placed, validateTable } from "./helpers.js";
 
 // Le journal, une entrée par évènement : son type et sa bille, et ce qui distingue
 // un départ (sa cause), une arrivée (d'où) ou un effet (son déclencheur).
@@ -25,6 +26,87 @@ export default function checkMarblesPath(run) {
   run.section("Défausser", checkDiscard);
   run.section("Rebond", checkBounce);
   run.section("Ramasser", checkRetrieve);
+  run.section("la bille éjectée", checkKnockedOut);
+}
+
+// LA BILLE ÉJECTÉE (marbles/core/effects.js/KNOCKED_OUT) : pendant le Tic de la bille
+// posée, la délogée est en partance (son Éjection joue après) ; Empocher et Rebond
+// la redirigent. Son Éjection joue quand même, et peut la rediriger à son tour : la
+// dernière redirection l'emporte. Jamais hors d'un Tic.
+function checkKnockedOut(run) {
+  const table = {
+    plain: {},
+    // Éjection et Chute : l'Éjection joue toujours, la Chute seulement à la défausse.
+    victim: { knockout: [{ action: "speed", amount: 3 }], drop: [{ action: "mass", amount: 5 }], pocketed: { entry: [{ action: "speed", amount: 10 }] } },
+    // Son Éjection la renvoie en main : après le Tic, elle l'emporte.
+    bouncer: { knockout: [{ action: "bounce" }] },
+    pocketer: { hit: [{ action: "pocket", target: "knockedOut" }] },
+    returner: { hit: [{ action: "bounce", target: "knockedOut" }] },
+  };
+  const rules = fabricatedRules(table);
+  const state = (over) => marblesPlayState(rules, { bag: ["plain"], ...over });
+  const place = (over) => mustReduce(rules, state(over), { type: "place", handIndex: 0, slot: "apex" });
+  const toApex = { type: "place", handIndex: 0, slot: "apex" };
+
+  // Empocher : au pot, son entrée ; son Éjection joue (en partance), jamais sa Chute.
+  const pocketing = { hand: inHand(["pocketer"]), triangle: { rightBase: null, leftBase: null, apex: placed("victim") } };
+  const pocketed = place(pocketing);
+  run.same(
+    "Empocher la bille éjectée : la pose, le Tic qui la redirige, son Éjection, son arrivée au pot, son entrée",
+    ["removed:victim:replacement", "placed:pocketer", "hit:pocketer", "effect:hit:pocketer", "redirected:victim", "knockout:victim", "effect:knockout:victim", "pocketed:victim:triangle", "effect:pocketEntry:victim"],
+    journal(pocketed.events).slice(1)
+  );
+  run.same("Empocher la bille éjectée : au pot, la défausse vide, la posée en pointe", { pot: ["victim"], discard: [], apex: "pocketer" }, { pot: pocketed.state.pot, discard: pocketed.state.discard, apex: pocketed.state.triangle.apex.marble });
+  run("Empocher la bille éjectée : pas de Chute", false, pocketed.events.some((event) => event.trigger === "drop"));
+  run("Empocher la bille éjectée : Éjection (+3) et entrée (+10) comptées", 13, pocketed.state.speed);
+  run.same(
+    "Empocher la bille éjectée : un déclenchement d'Empocher, une bille déplacée, une éjectée",
+    { pocket: 1, pocketQuantity: 1, ejectedMarbles: 1 },
+    { pocket: pocketed.state.tally.pocket.game, pocketQuantity: pocketed.state.tally.pocketQuantity.game, ejectedMarbles: pocketed.state.tally.ejectedMarbles.game }
+  );
+  run("Empocher la bille éjectée : aucune bille perdue ni dupliquée", marbleCount(state(pocketing)), marbleCount(pocketed.state));
+  run("Empocher la bille éjectée : prévision égale au réel", true, forecastMatches(rules, state(pocketing), toApex));
+
+  // Pot plein : perdue, sans entrée.
+  const fullPot = place({ ...pocketing, pot: ["plain", "plain", "plain"] });
+  run.same("Empocher la bille éjectée, pot plein : perdue, sans entrée", { lost: ["victim"], speed: 3 }, { lost: fullPot.state.lost, speed: fullPot.state.speed });
+
+  // Rebond : en main, à 0 tour en main, sans Chute ; main pleine, la défausse et sa Chute.
+  const returning = { hand: inHand(["returner"]), triangle: { rightBase: null, leftBase: null, apex: placed("victim") } };
+  const returned = place(returning);
+  run.same("Rebond de la bille éjectée : en main, à 0 tour en main", [{ marble: "victim", turnsInHand: 0 }], returned.state.hand);
+  run.same("Rebond de la bille éjectée : son Éjection joue, pas sa Chute", { speed: 3, mass: 1 }, { speed: returned.state.speed, mass: returned.state.mass });
+  run("Rebond de la bille éjectée : prévision égale au réel", true, forecastMatches(rules, state(returning), toApex));
+  const crowded = { hand: inHand(["returner", "plain", "plain", "plain", "plain", "plain"]), handSize: 5, triangle: { rightBase: null, leftBase: null, apex: placed("victim") } };
+  const full = place(crowded);
+  run.same("Rebond de la bille éjectée, main pleine : la défausse, et sa Chute", { discard: ["victim"], mass: 6 }, { discard: full.state.discard, mass: full.state.mass });
+
+  // Son Éjection la redirige après le Tic : la dernière redirection l'emporte.
+  const overruled = place({ hand: inHand(["pocketer"]), triangle: { rightBase: null, leftBase: null, apex: placed("bouncer") } });
+  run.same("la dernière redirection l'emporte : son Éjection, après le Tic, la renvoie en main", { pot: [], hand: ["bouncer"] }, { pot: overruled.state.pot, hand: overruled.state.hand.map(({ marble }) => marble) });
+  run(
+    "la dernière redirection l'emporte : deux déclenchements, Empocher et Rebond",
+    "1 1",
+    `${overruled.state.tally.pocket.game} ${overruled.state.tally.bounce.game}`
+  );
+
+  // Jamais hors d'un Tic : la bille éjectée n'y existe pas.
+  const refused = (field) => throws(() => validateTable({ x: { [field]: [{ action: "pocket", target: "knockedOut" }] } }));
+  run("validation, la bille éjectée : permise au Tic", false, refused("hit"));
+  run.same(
+    "validation, la bille éjectée : refusée en phase, à la Chiquenaude, à l'Éjection, au Final, à la Chute",
+    [true, true, true, true, true, true],
+    ["base", "apex", "flick", "knockout", "final", "drop"].map(refused)
+  );
+  run("validation, la bille éjectée : refusée en poche", true, throws(() => validateTable({ x: { pocketed: { hit: [{ action: "pocket", target: "knockedOut" }] } } })));
+  run("validation, la bille éjectée : refusée pour Défausser", true, throws(() => validateTable({ x: { hit: [{ action: "discard", target: "knockedOut" }] } })));
+
+  // La fiche.
+  run.same(
+    "fiche : Empocher et Rebond de la bille éjectée",
+    ["card.hit{effect: effect.combined{parts: [effect.pocket_knocked_out]}}", "card.hit{effect: effect.combined{parts: [effect.bounce_knocked_out]}}"],
+    ["pocketer", "returner"].map((marble) => marbleCard(marble, marble, rules, t).below.find((line) => line.startsWith("card.hit")))
+  );
 }
 
 // REBOND : vers la main, à 0 tour en main, sans Éveil ; depuis le triangle, ni Final
@@ -130,13 +212,13 @@ function checkRetrieve(run) {
   const place = (over, slot = "rightBase") => mustReduce(rules, state(over), { type: "place", handIndex: 0, slot });
   const occupied = { rightBase: placed("plain"), leftBase: null, apex: null };
 
-  // La dernière arrivée : au Tic, la bille remplacée, arrivée juste avant ; de la
-  // défausse à la main, sans Éveil.
-  const last = place({ hand: inHand(["last"]), discard: ["plain"], triangle: { rightBase: placed("waker"), leftBase: null, apex: null } });
-  run.same("Ramasser la dernière : la remplacée, en main, à 0 tour en main", [{ marble: "waker", turnsInHand: 0 }], last.state.hand);
+  // La dernière arrivée : au Tic, celle d'avant la pose, la remplacée étant encore en
+  // partance (son Éjection joue après le Tic) ; de la défausse à la main, sans Éveil.
+  const last = place({ hand: inHand(["last"]), discard: ["waker"], triangle: { rightBase: placed("plain"), leftBase: null, apex: null } });
+  run.same("Ramasser la dernière : celle d'avant la pose, en main, à 0 tour en main", [{ marble: "waker", turnsInHand: 0 }], last.state.hand);
   run("Ramasser la dernière : pas d'Éveil", false, last.events.some((event) => event.type === "awaken" || (event.type === "effect" && event.trigger === "awaken")));
-  run.same("Ramasser la dernière : la défausse, sans elle", ["plain"], last.state.discard);
-  run.same("Ramasser la dernière : l'arrivée dit sa place d'origine dans la défausse", { from: "discard", index: 1 }, (({ from, index }) => ({ from, index }))(last.events.find((event) => event.type === "returned")));
+  run.same("Ramasser la dernière : la défausse, sans elle, puis la remplacée arrivée après le Tic", ["plain"], last.state.discard);
+  run.same("Ramasser la dernière : l'arrivée dit sa place d'origine dans la défausse", { from: "discard", index: 0 }, (({ from, index }) => ({ from, index }))(last.events.find((event) => event.type === "returned")));
   run.same("Ramasser : un ramassage, une bille", "1 1", `${last.state.tally.retrieve.game} ${last.state.tally.retrieveQuantity.game}`);
   const resolve = (over) => mustReduce(rules, state(over), { type: "resolve" });
   const none = resolve({ discard: [], triangle: { rightBase: placed("baseLast"), leftBase: null, apex: null } });
@@ -150,14 +232,15 @@ function checkRetrieve(run) {
   const crowded = resolve({ hand: fullHand, discard: ["waker"], triangle: { rightBase: placed("basePicker"), leftBase: null, apex: null } });
   run.same("Ramasser au choix, main pleine : aucun choix, noté", { pending: null, noted: true }, { pending: crowded.state.pendingChoice, noted: crowded.events.some((event) => event.type === "targetEmpty" && event.target === "handFull") });
 
-  // Au choix : la défausse dans l'ordre d'arrivée ; la bille choisie en main.
+  // Au choix : la défausse dans l'ordre d'arrivée, sans la remplacée, en partance
+  // pendant le Tic ; la bille choisie en main.
   const picking = place({ hand: inHand(["picker"]), discard: ["waker", "plain"], triangle: occupied });
-  run.same("Ramasser au choix : la défausse, dans l'ordre d'arrivée", ["waker", "plain", "plain"], picking.state.pendingChoice.eligible.map((target) => target.marble));
-  run.same("Ramasser au choix : des cibles de la défausse", ["discard", "discard", "discard"], picking.state.pendingChoice.eligible.map((target) => target.zone));
+  run.same("Ramasser au choix : la défausse, dans l'ordre d'arrivée, sans la remplacée", ["waker", "plain"], picking.state.pendingChoice.eligible.map((target) => target.marble));
+  run.same("Ramasser au choix : des cibles de la défausse", ["discard", "discard"], picking.state.pendingChoice.eligible.map((target) => target.zone));
   const picked = mustReduce(rules, picking.state, { type: "choose", target: { zone: "discard", index: 0 } });
   run.same("Ramasser au choix : waker en main, sans Éveil", { hand: ["waker"], awaken: false }, { hand: picked.state.hand.map(({ marble }) => marble), awaken: picked.events.some((event) => event.type === "awaken") });
   // Deux choix : la seconde bille suivie malgré le départ de la première (la
-  // remplacée arrive en dernier, place 3).
+  // remplacée arrive après le Tic, après les deux choix).
   const two = place({ hand: inHand(["twoPicker"]), discard: ["waker", "plain", "waker"], triangle: occupied });
   const firstPick = mustReduce(rules, two.state, { type: "choose", target: { zone: "discard", index: 0 } });
   const secondPick = mustReduce(rules, firstPick.state, { type: "choose", target: { zone: "discard", index: 2 } });
@@ -170,11 +253,8 @@ function checkRetrieve(run) {
   const seeking = place({ hand: inHand(["plain"]), discard: ["waker"], triangle: { rightBase: placed("seeker"), leftBase: null, apex: null } });
   run.same("Ramasser pendant l'Éjection : la bille en partance n'est pas proposée", ["waker"], seeking.state.pendingChoice.eligible.map((target) => target.marble));
   run.same(
-    "Ramasser pendant l'Éjection : la lancée et l'éjectée en transit, pour information",
-    [
-      { kind: "thrown", marble: "plain", slot: "rightBase" },
-      { kind: "leaving", marble: "seeker", slot: "rightBase" },
-    ],
+    "Ramasser pendant l'Éjection : l'éjectée en transit, pour information ; la lancée, arrivée avant son Tic, n'y est plus",
+    [{ kind: "leaving", marble: "seeker", slot: "rightBase" }],
     seeking.state.pendingChoice.inTransit
   );
 
@@ -225,7 +305,9 @@ function checkDiscard(run) {
     journal(fromSlot.events).filter((entry) => /dropper/.test(entry))
   );
   run("Défausser, emplacement : ni Final ni Éjection pour la bille défaussée", false, fromSlot.events.some((event) => (event.type === "final" || event.type === "knockout") && event.marble === "dropper"));
-  run.same("Défausser, emplacement : la pointe vidée, la bille à la défausse", { apex: null, discard: ["plain", "dropper"] }, { apex: fromSlot.state.triangle.apex, discard: fromSlot.state.discard });
+  // Le Tic défausse avant que la remplacée n'arrive (elle est en partance) : la
+  // défaussée arrive la première.
+  run.same("Défausser, emplacement : la pointe vidée, la bille à la défausse avant la remplacée", { apex: null, discard: ["dropper", "plain"] }, { apex: fromSlot.state.triangle.apex, discard: fromSlot.state.discard });
   run.same(
     "Défausser, emplacement : une sortie du triangle de plus (la remplacée compte aussi), ni usée",
     { triangleExits: 1, ejectedMarbles: 1, wornMarbles: 0, discardedMarbles: 2, discard: 1, discardQuantity: 1 },
@@ -264,7 +346,7 @@ function checkDiscard(run) {
   run.same("Défausser au choix, main : la bille choisie, sa Chute", { hand: ["plain"], dropped: true }, { hand: handChosen.state.hand.map(({ marble }) => marble), dropped: handChosen.events.some((event) => event.trigger === "drop") });
   const triChoice = place({ hand: inHand(["fromTriangle"]), triangle: { rightBase: placed("plain"), leftBase: placed("dropper"), apex: null } });
   const triChosen = choose1(triChoice, { zone: "triangle", slot: "leftBase" });
-  run.same("Défausser au choix, triangle : la bille choisie quitte le triangle", { leftBase: null, discard: ["plain", "dropper"] }, { leftBase: triChosen.state.triangle.leftBase, discard: triChosen.state.discard });
+  run.same("Défausser au choix, triangle : la bille choisie quitte le triangle, à la défausse avant la remplacée", { leftBase: null, discard: ["dropper", "plain"] }, { leftBase: triChosen.state.triangle.leftBase, discard: triChosen.state.discard });
 
   // Toutes les minibilles actives, dans l'ordre horaire, chacune sa Chute.
   const smalls = place({ hand: inHand(["allSmall"]), triangle: { rightBase: placed("plain"), leftBase: placed("small"), apex: placed("small") } });
@@ -342,9 +424,9 @@ function checkDrop(run) {
   // Remplacement et Éjecter : la Chute de la bille chassée, à son arrivée.
   const replaced = mustReduce(rules, state({ hand: inHand(["plain"]), triangle: { rightBase: null, leftBase: null, apex: placed("faller") } }), { type: "place", handIndex: 0, slot: "apex" });
   run.same(
-    "Chute, remplacement : départ, Éjection, arrivée, Chute, puis la pose",
-    ["removed:faller:replacement", "knockout:faller", "discarded:faller:triangle", "effect:drop:faller", "placed:plain"],
-    journal(replaced.events).slice(1, 6)
+    "Chute, remplacement : départ, la pose et son Tic, Éjection, arrivée, Chute",
+    ["removed:faller:replacement", "placed:plain", "hit:plain", "knockout:faller", "discarded:faller:triangle", "effect:drop:faller"],
+    journal(replaced.events).slice(1, 7)
   );
   run("Chute, remplacement : pas de Final", false, replaced.events.some((event) => event.type === "final"));
   const ejected = mustReduce(rules, state({ hand: inHand(["ejector"]), triangle: { rightBase: placed("plain"), leftBase: null, apex: placed("faller") } }), { type: "place", handIndex: 0, slot: "rightBase" });

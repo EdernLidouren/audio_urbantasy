@@ -46,13 +46,15 @@ export default function checkMarblesForecast(run) {
 // régénération, sans jamais dire lesquelles, ni toucher au hasard de la partie.
 function checkBlindDraws(run) {
   const occupied = { leftBase: null, rightBase: null, apex: placed("size_count") };
-  // base_pocket n'est qu'au sac : la prévision ne doit jamais le nommer.
-  const state = playState({ hand: inHand(["split_base"]), bag: ["base_pocket"], discard: [], triangle: occupied });
+  // base_pocket n'est qu'au sac : la prévision ne doit jamais le nommer. Le Tic pioche
+  // le premier (base_pocket), puis l'Éjection de size_count, sac vide, régénère la
+  // défausse d'avant la pose (fragile) : size_count, en partance, n'y est pas encore.
+  const state = playState({ hand: inHand(["split_base"]), bag: ["base_pocket"], discard: ["fragile"], triangle: occupied });
   const predicted = rules.forecast(state, { type: "place", handIndex: 0, slot: "apex" });
   run.same("aveugle : l'Éjection pioche 1", { marble: "size_count", speed: 0, mass: 0, draw: 1, operations: [], given: [] }, predicted.knockout);
   run.same("aveugle : le Tic pioche 1", { marble: "split_base", speed: 0, mass: 0, draw: 1, operations: [], given: [] }, predicted.hit);
   run("aveugle : deux billes piochées", 2, predicted.drawn);
-  run("aveugle : la seconde régénère le sac (size_count éjecté)", 1, predicted.regenerations.length);
+  run("aveugle : la seconde régénère le sac (la défausse d'avant la pose)", 1, predicted.regenerations.length);
   run("aveugle : aucune bille du sac révélée", false, JSON.stringify(predicted).includes("base_pocket"));
   run("aveugle : rien d'incertain, aucune bille n'écoute la main", false, predicted.uncertain);
 
@@ -270,9 +272,11 @@ function checkPocketForecast(run) {
   run("cible vide prévue : égal au réel", true, matches(alone, toApex));
 
   // Une bille piochée à l'aveugle puis empochée : inconnue, prévision incertaine,
-  // sans Éveil possible pour autant.
-  const blind = playState({ hand: inHand(["hit_pocket"]), bag: ["aging_flick"], triangle: { leftBase: null, rightBase: null, apex: placed("size_count") } });
-  const unknown = rules.forecast(blind, toApex);
+  // sans Éveil possible pour autant. Le Tic pioche, puis empoche la première de la
+  // main (les valeurs, Pioche comprise, avant les actions sur une bille).
+  const drawPocket = fabricatedRules({ drawPocket: { hit: [{ action: "draw", amount: 1 }, { action: "pocket", target: "firstInHand" }] }, plain: {} });
+  const blind = marblesPlayState(drawPocket, { hand: inHand(["drawPocket"]), bag: ["plain"], triangle: { leftBase: null, rightBase: null, apex: placed("plain") } });
+  const unknown = drawPocket.forecast(blind, toApex);
   run.same("pot prévu, bille inconnue : empochée sans être nommée", [{ marble: null, lost: false, entry: null }], unknown.hit.pockets);
   run("pot prévu, bille inconnue : incertaine", true, unknown.uncertain);
   run("pot prévu, bille inconnue : aucun Éveil possible", false, unknown.awakenPossible);

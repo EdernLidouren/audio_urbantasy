@@ -6,7 +6,7 @@
 
 import { MARBLE_POCKET, MARBLE_TRIGGERS } from "../../config/values.js";
 import { resultText } from "./goal.js";
-import { FIRST_IN_HAND, isOptionalChoice } from "../../core/effects.js";
+import { FIRST_IN_HAND, KNOCKED_OUT, isOptionalChoice } from "../../core/effects.js";
 import { choiceTarget, combined, describeEffect, effectMoment, formatCounter, marbleName, marbleRef, outcomeLine, slotName, statusName, valueParts } from "./effects.js";
 import { statusLabel } from "./statuses.js";
 
@@ -105,6 +105,7 @@ const EVENT_TEXTS = {
     if (event.target === "self") return t("marbles.event.target_empty_self", { marble: marbleRef(event.marble) });
     if (event.target === "bag") return t("marbles.event.target_empty_bag");
     if (event.target === "lastDiscarded") return t("marbles.event.target_empty_discard");
+    if (event.target === KNOCKED_OUT) return t("marbles.event.target_empty_knocked_out");
     if (event.target === "handFull") return t("marbles.event.target_empty_hand_full");
     if (event.target === "noReference") return t("marbles.event.target_empty_no_reference");
     return t("marbles.event.target_empty", { slot: slotName(event.slot, t) });

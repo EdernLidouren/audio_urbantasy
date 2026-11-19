@@ -445,9 +445,11 @@ function swapSlots(run, { a, b }) {
 // la bille quitte la main (son compteur avec elle) et sa Chiquenaude joue : en cours
 // de lancer, elle n'est ni en main ni sur le triangle. Puis, sur un emplacement
 // occupé, le trajet de l'occupante (marbles/core/path.js/travel, cause
-// "replacement") : son départ, son Éjection pendant qu'elle est en partance, son
-// arrivée (la défausse sauf redirection) ; puis la nouvelle bille rejoint
-// l'emplacement, et son Tic. Sur un emplacement vide, la bille le rejoint
+// "replacement") : son départ, elle en partance ; la nouvelle bille rejoint
+// l'emplacement et son Tic joue (`meanwhile`), l'occupante toujours en partance,
+// que le Tic peut rediriger ; puis l'Éjection de l'occupante et son arrivée (la
+// défausse sauf redirection). L'ordre que voit le joueur : la bille posée frappe,
+// puis la délogée réagit en partant. Sur un emplacement vide, la bille le rejoint
 // seulement. L'emplacement se lit APRÈS la Chiquenaude : si elle l'a vidé (une
 // Fêlure qui retire l'occupante, Final compris), la pose se poursuit comme sur un
 // vide, sans Éjection ni Tic.
@@ -464,14 +466,20 @@ function placeMarble(run, { handIndex, slot }) {
   const previous = run.state.triangle[slot];
   // Le remplacement en cours, que Tic et Éjection portent (conditions de calibre).
   const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
-  if (previous !== null) {
-    const exit = { type: "knockout", slot, marble: previous.marble, replacement };
-    travel(run, { marble: previous.marble, from: { zone: "triangle", slot }, cause: "replacement", exit });
+  // L'arrivée de la bille lancée : son emplacement, puis, sur un remplacement, son Tic,
+  // réglé jusqu'au bout (run.settle) avant l'Éjection de la délogée.
+  const arrive = () => {
+    run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
+    run.inTransit = run.inTransit.filter((other) => other !== thrown);
+    run.settle({ type: "placed", slot, marble });
+    if (replacement !== null) run.settle({ type: "hit", slot, marble, replacement });
+  };
+  if (previous === null) {
+    arrive();
+    return;
   }
-  run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear: 0 } } });
-  run.inTransit = run.inTransit.filter((other) => other !== thrown);
-  run.emit({ type: "placed", slot, marble });
-  if (previous !== null) run.emit({ type: "hit", slot, marble, replacement });
+  const exit = { type: "knockout", slot, marble: previous.marble, replacement };
+  travel(run, { marble: previous.marble, from: { zone: "triangle", slot }, cause: "replacement", exit, meanwhile: arrive });
 }
 
 // Les crans de la rotation de fin de tour, portés par l'évènement `rotation` : la vue

@@ -43,19 +43,19 @@ function checkZoneConditions(run) {
   run.same("pot vide : 0 oui, 1 non", [true, false], [[], ["plain"]].map((pot) => test("pot", "empty", { pot })));
 
   // Les billes en transit ne comptent nulle part : pendant sa Chiquenaude, la bille
-  // lancée n'est plus en main ; pendant son Éjection, la seule bille active n'est
-  // plus sur le triangle.
+  // lancée n'est plus en main ; pendant son Éjection par une pose, la délogée n'est
+  // plus sur le triangle, où la posée est déjà arrivée.
   const table = {
     plain: {},
     lonelyFlick: { flick: [{ action: "speed", amount: 1, when: zoneIs("hand", "empty") }] },
-    lonelyKnock: { knockout: [{ action: "speed", amount: 2, when: zoneIs("triangle", "empty") }] },
+    lonelyKnock: { knockout: [{ action: "speed", amount: 2, when: zoneIs("triangle", "single") }] },
     potWatcher: { pocketed: { resolution: [{ action: "mass", amount: 2, when: zoneIs("pot", "full") }] } },
   };
   const made = fabricatedRules(table);
   const flicked = mustReduce(made, marblesPlayState(made, { hand: inHand(["lonelyFlick"]) }), { type: "place", handIndex: 0, slot: "apex" });
   run("transit : en Chiquenaude, la main de la bille lancée est vide", 1, flicked.state.speed);
   const knocked = mustReduce(made, marblesPlayState(made, { hand: inHand(["plain"]), triangle: { rightBase: null, leftBase: null, apex: placed("lonelyKnock") } }), { type: "place", handIndex: 0, slot: "apex" });
-  run("transit : en partance, à son Éjection, le triangle est vide", 2, knocked.state.speed);
+  run("transit : en partance, à son Éjection par une pose, seule la posée est sur le triangle", 2, knocked.state.speed);
   // En poche, à chaque résolution : le pot plein, à la capacité en vigueur.
   const potFull = mustReduce(made, marblesPlayState(made, { bag: ["plain"], pot: ["potWatcher", "plain"], potCapacity: 2 }), { type: "resolve" });
   run("en poche : pot plein, Masse +2", 3, potFull.events.find((event) => event.type === "impact").mass);

@@ -316,13 +316,15 @@ bille ». Toute sortie d'une bille de sa zone passe par **un seul déroulé**
    prend pas). Depuis le triangle, `removed` le dit, avec sa cause ; sa phase, si elle
    n'avait pas eu lieu, est sautée. `removed` entre au journal sans passer par la file
    (`run.record`) : ses réactions se règlent après le déclencheur de sortie (voir « Les
-   réactions »).
+   réactions »). Un remplacement intercale ici (`meanwhile`) l'arrivée de la bille posée et
+   son Tic (voir « Déroulé d'une pose »).
 2. **Déclencheur de sortie**, s'il y en a un : le **Final** (`final`, une sortie par
    usure, normale ou par Fêlure) ou l'**Éjection** (`knockout`, par une pose ou par
    Éjecter), une interruption réglée jusqu'au bout. La bille y est `"leaving"`
    (`HOLDER_ZONES`) : Polissage, Fêlure et Éjecter sur elle-même y sont refusés à la
    validation ; Empocher sur elle-même **redirige** sa destination (`redirected`). Son
-   départ, lui, est acquis : rien ne l'annule.
+   départ, lui, est acquis : rien ne l'annule. Le Tic d'une pose, joué avant, peut aussi la
+   rediriger (« la bille éjectée », `KNOCKED_OUT`) ; la dernière redirection l'emporte.
 3. **Destination** : la défausse par défaut, celle de l'action qui la déplace
    (`CLAUSE_ACTIONS`, `moves` : le pot pour Empocher, la défausse pour Défausser, la main
    pour Rebond et Ramasser), ou la dernière qu'une redirection a posée (Empocher : le pot ;
@@ -356,19 +358,30 @@ Trouvaille. Elle est **en transit** (voir « Cibles au choix », `inTransit`) : 
 zone, jamais une cible, mais un choix ouvert pendant son lancer la connaît, avec
 l'emplacement qu'elle vise. L'emplacement visé se lit ensuite : sur un emplacement
 vide, A le rejoint, sans Éjection ni Tic. Sur un emplacement occupé par une bille B, dans
-cet ordre, visible au journal :
+cet ordre, visible au journal (le trajet de B, `travel`, avec l'arrivée de A et son Tic
+pour `meanwhile`) :
 
 | Étape | Évènement du journal |
 |---|---|
 | Chiquenaude de A | `flick` (`turnsInHand` : son compteur en quittant la main), puis `effect` si A en a une, suivi de ses pioches et de ses actions sur une bille |
 | B quitte son emplacement, en partance | `removed` (`cause: "replacement"`) |
-| Éjection de B | `knockout`, puis `effect` si B en a une, suivi de ses pioches (`draw`…) si elle pioche |
-| B arrive à la défausse (sauf redirection) | `discarded` (`cause: "replacement"`) |
 | A rejoint l'emplacement | `placed` |
-| Tic de A | `hit`, puis `effect` si A en a un, suivi de ses pioches s'il pioche |
+| Tic de A, réglé jusqu'au bout | `hit`, puis `effect` si A en a un, suivi de ses pioches s'il pioche et de ses actions sur une bille (une redirection de B, `redirected`) |
+| Éjection de B, en partance | `knockout`, puis `effect` si B en a une, suivi de ses pioches (`draw`…) si elle pioche |
+| B arrive à sa destination | `discarded` (`cause: "replacement"`), ou `pocketed`, `lost`, `returned` après une redirection |
 
 `knockout` et `hit` portent le remplacement en cours, `replacement: { placed, ejected }`
 (les ids de A et de B), que lit la condition de calibre relatif (voir « Conditions »).
+
+Le joueur entend la bille posée frapper, puis la délogée réagir en partant. Pendant le Tic,
+B n'est nulle part : ni active ni à la défausse (un Tic qui pioche ou qui ramasse ne la
+trouve pas), mais la cible **la bille éjectée** (`KNOCKED_OUT`, forme courte du même nom,
+Empocher et Rebond, dans un Tic seulement, refusée ailleurs à la validation) la redirige
+vers le pot ou la main ; son Éjection joue quand même ensuite, et peut la rediriger à son
+tour (la dernière redirection l'emporte). Pendant l'Éjection de B, A est déjà sur
+l'emplacement : une cible « toutes les billes actives » ou au choix peut la viser, et un
+ricochet (une Éjection qui éjecte l'emplacement suivant) qui fait le tour du triangle la
+chasse à son tour.
 
 **Une Chiquenaude qui vide l'emplacement visé** : une Fêlure qui amène B à son usure
 maximale (B suit le retrait par usure habituel, `removed`, `cause: "wear"`, son Final,
@@ -503,7 +516,8 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
     portent l'usure demandée (`amount`), celle réellement appliquée (`applied`) et
     `retires`, vrai si la bille part ;
   - `pocket`, **Empocher**, sans montant : envoie au pot la bille elle-même, celle d'un
-    emplacement ou la première de la main (voir « Le pot ») ;
+    emplacement, la première de la main, ou, dans un Tic, la bille éjectée (`KNOCKED_OUT`,
+    une redirection ; voir « Déroulé d'une pose ») (voir « Le pot ») ;
   - `eject`, **Éjecter**, sans montant : chasse une ou plusieurs billes actives du
     triangle, sans pose (voir « Éjecter ») ;
   - `discard`, **Défausser**, sans montant : envoie à la défausse la bille elle-même (sur
@@ -514,7 +528,8 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
     vide, `targetEmpty`, cible `"bag"`). Jamais depuis le pot ;
   - `bounce`, **Rebond**, sans montant : renvoie en main la bille elle-même (sur le
     triangle, ou en partance : une redirection), celle d'un emplacement, des billes
-    actives au choix, ou toutes les billes actives filtrées ; à 0 tour en main, sans
+    actives au choix, toutes les billes actives filtrées, ou, dans un Tic, la bille
+    éjectée (`KNOCKED_OUT`, une redirection) ; à 0 tour en main, sans
     Éveil. Main pleine à l'arrivée : la défausse à la place (`discarded`, `handFull`), et
     sa Chute ;
   - `retrieve`, **Ramasser**, sans montant, toujours une cible : reprend en main la
@@ -751,7 +766,8 @@ existera, sa phrase combinée s'écrira avec lui.
 Ni Tic (rien n'arrive), ni Final (ce n'est pas une usure). Pendant la résolution, une bille
 chassée avant sa phase la saute. Partie dès son départ, elle n'est plus sur le triangle
 pendant son Éjection : rien ne peut la chasser une seconde fois, et une Éjection qui vise
-son propre emplacement le trouve vide (sans effet, noté).
+son propre emplacement le trouve vide (sans effet, noté) ; chassée par une pose, elle y
+trouve la bille posée, déjà arrivée.
 « Toutes les billes actives » et les choix comprennent la bille qui éjecte (une règle
 voulue ; un filtre « les autres » est en suspens). Cible vide ou aucune bille
 visée : sans effet, noté (`targetEmpty`, « Aucune bille visée : sans effet. »).
@@ -841,8 +857,9 @@ seulement. Deux natures (`kind`) :
   arrivée (`placeMarble`), vers l'emplacement visé, `slot` (voir « Déroulé d'une
   pose ») ;
 - `"leaving"`, **en partance** : la bille qui a quitté sa zone, le temps de son
-  déclencheur de sortie (son Final, son Éjection), depuis l'emplacement quitté, `slot`,
-  ou null hors du triangle (voir « Le chemin des billes »).
+  déclencheur de sortie (son Final, son Éjection ; délogée par une pose, aussi le temps
+  du Tic de la posée), depuis l'emplacement quitté, `slot`, ou null hors du triangle
+  (voir « Le chemin des billes »).
 
 Le déroulé les tient (`run.inTransit`, `marbles/core/run.js`/`transact`) et les copie
 dans le choix qui suspend l'action : l'état n'en a pas d'autre trace, elles ne peuvent
@@ -1519,13 +1536,13 @@ un emplacement, occupé ou non par une bille B :
    Final de la bille posée si elle
    atteint son usure maximale ce tour (« Vitesse +6. Final : Pioche 1. ») ;
 3. toujours, « Chiquenaude de A : Vitesse +2 », ou « … : aucun effet » ;
-4. sur un emplacement occupé, « Éjection de B : Vitesse +3 », ou « … : aucun effet » ;
-5. sur un emplacement occupé, « Tic de A : Vitesse +2 », ou « … : aucun effet ». Un
+4. sur un emplacement occupé, « Tic de A : Vitesse +2 », ou « … : aucun effet ». Un
    Empocher prévu s'y dit chez la bille qui le produit, avec ce qu'il déplace et l'entrée
    au pot : « Tic de A : Vitesse +4 et Empocher la première bille de la main, puis
    X en poche, à l'entrée : Vitesse +10 » (pot plein : « …, puis pot plein :
    X perdue ») ; une cible vide, de même, avant (« …, main vide ») ; de même
    dans les valeurs prévues de la bille posée ;
+5. sur un emplacement occupé, « Éjection de B : Vitesse +3 », ou « … : aucun effet » ;
 6. pour chaque régénération du sac que la pose et la résolution provoqueraient, « Le sac
    sera régénéré. » (« Le sac sera de nouveau régénéré. » pour les suivantes), puis une
    ligne par Trouvaille qu'elle déclencherait (« Trouvaille de X : Vitesse +3. ») ;
@@ -1541,7 +1558,7 @@ un emplacement, occupé ou non par une bille B :
 10. Confirmer.
 
 Une Chiquenaude qui viderait l'emplacement visé (une Chiquenaude qui éjecte la pointe,
-posée en pointe) laisse les lignes d'Éjection et de Tic à « aucun effet » : elles
+posée en pointe) laisse les lignes de Tic et d'Éjection à « aucun effet » : elles
 n'auront pas lieu, et le menu garde sa structure.
 
 Une Pioche s'y dit comme une valeur (« Tic de A : Pioche 1 »), sans jamais nommer une
@@ -1584,8 +1601,9 @@ choix du joueur ». Les gabarits :
   transit l'annonce après son contenu, avant « Non éligible. » s'il y a lieu, selon sa
   nature (`marbles.choice.in_transit.<kind>`) : l'emplacement que vise une bille en cours
   de lancer (`thrown`, « Base droite, vide. En approche : X. Non éligible. »), celui que
-  vient de quitter une bille en partance pendant son Final ou son Éjection (`leaving`,
-  « Pointe, vide. En partance : X. »). Jamais une cible ; rien de plus dans un choix de
+  vient de quitter une bille en partance pendant son Final ou son Éjection, ou pendant le
+  Tic de la bille qui la remplace (`leaving`, « Pointe, vide. En partance : X. » ; après un
+  remplacement, l'emplacement dit d'abord la bille posée). Jamais une cible ; rien de plus dans un choix de
   la main seule, où le triangle n'est pas parcouru, ni pour une bille en partance hors
   du triangle.
 - **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone

@@ -267,7 +267,14 @@ function checkAwaken(run) {
 
   // Pioche d'un effet (le Tic de split_base) : l'éveil aussi.
   const tic = apply(playState({ hand: inHand(["split_base"]), bag: ["all_rounder"], triangle: triangleOf(null, null, placed("hit_polish")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("éveil, pioche d'un effet : après la pioche", ["draw:all_rounder", "awaken:all_rounder", "effect:awaken:all_rounder"], journal(tic.events).slice(-3));
+  // L'Éjection et l'arrivée de la délogée (hit_polish) suivent le Tic.
+  run.same(
+    "éveil, pioche d'un effet : après la pioche",
+    ["draw:all_rounder", "awaken:all_rounder", "effect:awaken:all_rounder"],
+    journal(tic.events)
+      .filter((entry) => !entry.includes("hit_polish"))
+      .slice(-3)
+  );
   run("éveil, pioche d'un effet : la Vitesse au compteur du tour en cours", 2, tic.state.speed);
 
   // Main pleine : la bille reste au sac, pas d'éveil.
@@ -439,14 +446,15 @@ function checkDrawEffects(run) {
   run("pioche : avec une condition", false, throws(() => validateTable({ a: { apex: [{ ...draw1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 1 } }] } })));
   run.same("imprimé : la Pioche se lit comme une autre valeur", 1, printedStat(rules.effectAt("awaken_draw", "leftBase"), "draw"));
 
-  // Tic qui pioche : l'effet, puis la bille. Elle se joue dans le même tour.
+  // Tic qui pioche : l'effet, puis la bille, avant l'Éjection et l'arrivée de la
+  // délogée. Elle se joue dans le même tour.
   const hit = apply(
     playState({ hand: inHand(["split_base"]), bag: ["base_pocket", "final_pocket"], triangle: triangleOf(null, null, placed("hit_polish")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("tic qui pioche : journal", ["flick", "removed", "knockout", "discarded", "placed", "hit", "effect", "draw", "awaken"], eventTypes(hit.events));
-  run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[6].draw);
-  run("tic qui pioche : le haut du sac", "base_pocket", hit.events[7].marble);
+  run.same("tic qui pioche : journal", ["flick", "removed", "placed", "hit", "effect", "draw", "awaken", "knockout", "discarded"], eventTypes(hit.events));
+  run("tic qui pioche : l'effet dit sa Pioche", 1, hit.events[4].draw);
+  run("tic qui pioche : le haut du sac", "base_pocket", hit.events[5].marble);
   run("tic qui pioche : en main", "base_pocket", handIds(hit.state).join());
   const replay = rules.reduce(hit.state, { type: "place", handIndex: 0, slot: "leftBase" });
   run("tic qui pioche : la bille piochée se joue dans le même tour", true, replay.ok);
@@ -459,7 +467,7 @@ function checkDrawEffects(run) {
   // aging_flick a une Chiquenaude (à 0 tour en main, elle ne produit rien) : son effet passe.
   run.same(
     "éjection qui pioche : journal",
-    ["flick", "effect", "removed", "knockout", "effect", "draw", "awaken", "discarded", "placed", "hit", "effect"],
+    ["flick", "effect", "removed", "placed", "hit", "effect", "knockout", "effect", "draw", "awaken", "discarded"],
     eventTypes(knockout.events)
   );
   run("éjection qui pioche : en main", "final_pocket", handIds(knockout.state).join());
@@ -480,9 +488,12 @@ function checkDrawEffects(run) {
     { type: "place", handIndex: 0, slot: "apex" }
   );
   // La régénération, puis la Trouvaille de chaque bille active (ici split_base, sans
-  // ce champ : l'évènement passe, sans effet), puis la pioche reprend.
-  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenPlay.events).slice(-6));
-  run("régénération en jeu : la défausse entière, bille remplacée comprise", 3, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
+  // ce champ : l'évènement passe, sans effet), puis la pioche reprend ; la délogée,
+  // encore en partance, n'est pas dans la défausse mélangée.
+  const regenTypes = eventTypes(regenPlay.events);
+  run.same("régénération en jeu : dans le journal de la pose", ["hit", "effect", "bagRegenerated", "windfall", "draw", "awaken"], regenTypes.slice(regenTypes.indexOf("hit"), regenTypes.indexOf("hit") + 6));
+  run("régénération en jeu : la défausse entière, sans la remplacée en partance", 2, regenPlay.events.find((event) => event.type === "bagRegenerated").size);
+  run.same("régénération en jeu : la remplacée arrive ensuite, seule à la défausse", ["hit_polish"], regenPlay.state.discard);
   run("régénération en jeu : la partie continue", "play", regenPlay.state.stage);
   const regenResolve = apply(playState({ hand: inHand([]), bag: [], discard: ["final_pocket"], triangle: triangleOf(null, placed("awaken_draw"), null) }), { type: "resolve" });
   run.same("régénération en résolution : dans le journal", ["phase", "effect", "bagRegenerated", "windfall", "draw", "awaken"], eventTypes(regenResolve.events).slice(0, 6));
@@ -493,24 +504,32 @@ function checkDrawEffects(run) {
     playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), bag: [], discard: ["hit_pocket"], triangle: triangleOf(null, null, placed("base_pocket")) }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("tic qui pioche, main pleine après la pose : la pioche passe", ["draw", "awaken"], eventTypes(full.events).slice(-2));
+  // Ce qui précède l'Éjection de la délogée : le Tic et ce qu'il déclenche.
+  const beforeKnockout = (events) => eventTypes(events.slice(0, events.findIndex((event) => event.type === "knockout")));
+  run.same("tic qui pioche, main pleine après la pose : la pioche passe", ["draw", "awaken"], beforeKnockout(full.events).slice(-2));
   const fuller = { ...playState({ hand: inHand(["split_base", "aging_flick", "hit_polish", "final_pocket", "all_rounder"]), handSize: 4 }) };
   const stopped = apply({ ...fuller, bag: [], discard: ["one_shot"], triangle: triangleOf(null, null, placed("base_pocket")) }, { type: "place", handIndex: 0, slot: "apex" });
-  run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], eventTypes(stopped.events).slice(-2));
-  run("tic qui pioche, main pleine : motif", "handFull", stopped.events.at(-1).reason);
+  run.same("tic qui pioche, main pleine : arrêt sans régénération", ["effect", "drawSkipped"], beforeKnockout(stopped.events).slice(-2));
+  run("tic qui pioche, main pleine : motif", "handFull", stopped.events.find((event) => event.type === "drawSkipped").reason);
   const none = apply(playState({ hand: inHand(["split_base"]), bag: [], discard: [], triangle: triangleOf(null, null, placed("hit_polish")) }), { type: "place", handIndex: 0, slot: "apex" });
-  // La bille remplacée vient d'arriver en défausse : elle est repiochée.
-  run("tic qui pioche, sac vide : la remplacée revient", "hit_polish", handIds(none.state).join());
+  // La bille remplacée est en partance pendant le Tic, pas encore à la défausse : rien
+  // à piocher ; elle y arrive ensuite.
+  run.same(
+    "tic qui pioche, sac et défausse vides : rien à piocher, la remplacée arrive après",
+    { hand: [], discard: ["hit_polish"], reason: "noMarbles" },
+    { hand: handIds(none.state), discard: none.state.discard, reason: none.events.find((event) => event.type === "drawSkipped").reason }
+  );
   const nothing = apply(playState({ hand: inHand([]), bag: [], discard: [], triangle: triangleOf(null, placed("awaken_draw"), null) }), { type: "resolve" });
   run("phase qui pioche, rien à piocher : arrêt annoncé", "noMarbles", nothing.events.find((event) => event.type === "drawSkipped").reason);
   run("phase qui pioche, rien à piocher : jamais une fin de partie en cours de tour", "draw", nothing.state.stage);
 
-  // ANTI-BOUCLE : un Tic qui pioche à chaque pose, avec régénération possible ;
-  // les lancers arrêtent le joueur à 5 poses.
+  // ANTI-BOUCLE : un Tic qui pioche à chaque pose, avec régénération possible (la
+  // délogée de la pose précédente est à la défausse) ; les lancers arrêtent le
+  // joueur à 5 poses.
   let loop = playState({
     hand: inHand(["split_base"]),
     bag: [],
-    discard: [],
+    discard: ["split_base"],
     triangle: triangleOf(placed("split_base"), placed("split_base"), placed("split_base")),
   });
   let accepted = 0;
@@ -677,40 +696,47 @@ function checkPlace(run) {
 
 // Le déroulé d'une pose, les compteurs du tour : Tic et Éjection.
 function checkHitAndKnockout(run) {
-  // Ordre sur un emplacement occupé : Chiquenaude de A, départ de B, son Éjection
-  // en partance, son arrivée à la défausse, pose de A, Tic de A.
+  // Ordre sur un emplacement occupé : Chiquenaude de A, départ de B, pose de A, Tic
+  // de A, l'Éjection de B en partance, son arrivée à la défausse.
   const state = playState({ hand: inHand(["aging_flick"]), triangle: triangleOf(null, null, placed("hit_pocket", 1)) });
   const both = apply(state, { type: "place", handIndex: 0, slot: "apex" });
   run.same(
     "pose sur occupé : ordre du journal",
-    ["flick", "effect", "removed", "knockout", "effect", "discarded", "placed", "hit", "effect"],
+    ["flick", "effect", "removed", "placed", "hit", "effect", "knockout", "effect", "discarded"],
     eventTypes(both.events)
   );
   run.same(
     "pose sur occupé : qui joue quoi",
-    ["flick:aging_flick", "effect:aging_flick", "removed:hit_pocket", "knockout:hit_pocket", "effect:hit_pocket", "discarded:hit_pocket", "placed:aging_flick", "hit:aging_flick", "effect:aging_flick"],
+    ["flick:aging_flick", "effect:aging_flick", "removed:hit_pocket", "placed:aging_flick", "hit:aging_flick", "effect:aging_flick", "knockout:hit_pocket", "effect:hit_pocket", "discarded:hit_pocket"],
     both.events.map((event) => `${event.type}:${event.marble}`)
   );
   run.same(
     "Éjection : son effet et le cumul",
-    { type: "effect", trigger: "knockout", slot: "apex", marble: "hit_pocket", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 3, mass: 1 },
-    both.events[4]
+    { type: "effect", trigger: "knockout", slot: "apex", marble: "hit_pocket", speedDelta: 3, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 5, mass: 1 },
+    both.events[7]
   );
   run.same(
     "Tic : son effet et le cumul",
-    { type: "effect", trigger: "hit", slot: "apex", marble: "aging_flick", speedDelta: 2, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 5, mass: 1 },
-    both.events[8]
+    { type: "effect", trigger: "hit", slot: "apex", marble: "aging_flick", speedDelta: 2, massDelta: 0, draw: 0, operations: [], given: [], lost: [], speed: 2, mass: 1 },
+    both.events[5]
   );
 
   // Les bons moments : au Tic, la nouvelle bille est là ; à l'Éjection, l'occupante
-  // est déjà partie (en partance) et la nouvelle encore en lancer : l'emplacement
-  // est vide pour les conditions.
+  // est déjà partie (en partance) et la nouvelle est arrivée : l'emplacement est
+  // celui de la posée pour les conditions.
   const seenByKnockout = {
-    witness: { knockout: [{ action: "speed", amount: 1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 5 } }], apex: [{ action: "speed", amount: 5 }] },
+    witness: {
+      knockout: [
+        { action: "speed", amount: 1, when: { type: "printedStat", slot: "apex", stat: "speed", atLeast: 5 } },
+        { action: "mass", amount: 1, when: { type: "printedStat", slot: "apex", stat: "mass", atLeast: 2 } },
+      ],
+      apex: [{ action: "speed", amount: 5 }],
+    },
     arrival: { hit: [{ action: "mass", amount: 1, when: { type: "printedStat", slot: "apex", stat: "mass", atLeast: 2 } }], apex: [{ action: "mass", amount: 2 }] },
   };
   const moments = apply(playState({ hand: inHand(["arrival"]), triangle: triangleOf(null, null, placed("witness")) }), { type: "place", handIndex: 0, slot: "apex" }, seenByKnockout);
   run("Éjection : jouée en partance, la bille n'est plus sur son emplacement", 0, moments.events.find((event) => event.trigger === "knockout").speedDelta);
+  run("Éjection : jouée après le Tic, la posée est sur l'emplacement", 1, moments.events.find((event) => event.trigger === "knockout").massDelta);
   run("Tic : joué après l'arrivée de la bille", 1, moments.events.find((event) => event.trigger === "hit").massDelta);
 
   // Compteurs du tour, modifiés avant la résolution, et l'Impact en tient compte.
@@ -735,7 +761,7 @@ function checkHitAndKnockout(run) {
 
   // Une bille sans Tic ni Éjection : les évènements passent, aucun effet.
   const plain = apply(playState({ hand: inHand(["all_rounder"]), triangle: triangleOf(null, null, placed("fragile")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run.same("sans Tic ni Éjection : aucun effet", ["flick", "removed", "knockout", "discarded", "placed", "hit"], eventTypes(plain.events));
+  run.same("sans Tic ni Éjection : aucun effet", ["flick", "removed", "placed", "hit", "knockout", "discarded"], eventTypes(plain.events));
   run("sans Tic ni Éjection : compteurs intacts", "0,1", `${plain.state.speed},${plain.state.mass}`);
 
   // Ni Tic ni Éjection ailleurs.
@@ -1300,8 +1326,8 @@ function checkFlick(run) {
   run.same("chiquenaude : son effet, à l'emplacement visé, compté au tour", { trigger: "flick", slot: "apex", marble: "fragile", massDelta: 1, mass: 2 }, { trigger, slot, marble, massDelta, mass });
   const onOccupied = apply(playState({ hand: inHand(["fragile"]), triangle: triangleOf(null, null, placed("hit_pocket")) }), toApex);
   run.same(
-    "chiquenaude, occupé : Chiquenaude, départ, Éjection, arrivée à la défausse, pose, Tic",
-    ["flick", "effect", "removed", "knockout", "effect", "discarded", "placed", "hit"],
+    "chiquenaude, occupé : Chiquenaude, départ, pose, Tic, Éjection, arrivée à la défausse",
+    ["flick", "effect", "removed", "placed", "hit", "knockout", "effect", "discarded"],
     eventTypes(onOccupied.events)
   );
   const counted = apply(playState({ hand: inHand(["all_rounder"], 3) }), toApex);
@@ -1350,7 +1376,7 @@ function checkFlick(run) {
   const notCleared = apply(playState({ hand: inHand(["flick_strike"]), triangle: triangleOf(null, null, placed("all_rounder")) }), toApex, fixedRules);
   run.same(
     "chiquenaude : l'emplacement encore occupé, Éjection et Tic comme d'habitude",
-    ["flick", "effect", "cracked", "removed", "knockout", "discarded", "placed", "hit"],
+    ["flick", "effect", "cracked", "removed", "placed", "hit", "knockout", "discarded"],
     eventTypes(notCleared.events)
   );
   // Posée ailleurs, flick_strike fêle quand même la pointe.
@@ -1520,7 +1546,7 @@ function checkWindfall(run) {
     ["windfall:split_base"],
     typesAndMarbles(idle.events).filter((entry) => entry.startsWith("windfall"))
   );
-  run("trouvaille : aucun effet sans bille active qui en a une", 0, idle.state.speed);
+  run("trouvaille : aucun effet sans bille active qui en a une", false, idle.events.some((event) => event.type === "effect" && event.trigger === "windfall"));
   // En cours de lancer : la Chiquenaude qui pioche régénère, la bille lancée n'a pas
   // la sienne.
   const thrownTable = { thrower: { flick: [{ action: "draw", amount: 1 }], windfall: [{ action: "speed", amount: 5 }] }, plain: {} };

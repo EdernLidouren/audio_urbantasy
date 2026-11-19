@@ -117,16 +117,19 @@ function checkReferences(run) {
 
 // Le RICOCHET : une Éjection qui éjecte la bille de l'emplacement suivant, depuis
 // l'emplacement qu'elle quitte. La chaîne passe par le chemin des billes et reste
-// bornée : un emplacement déjà vidé n'a plus rien à éjecter.
+// bornée : un emplacement déjà vidé n'a plus rien à éjecter. La bille posée est
+// arrivée AVANT l'Éjection de la délogée (son Tic joue avant) : le ricochet fait le
+// tour du triangle et la chasse à son tour ; sans Éjection, elle arrête la chaîne.
 function checkRicochet(run) {
   const rules = fabricatedRules({ plain: {}, ricochet: { knockout: [{ action: "eject", target: NEXT }] } });
   const start = marblesPlayState(rules, { hand: inHand(["plain"]), triangle: { rightBase: placed("ricochet"), leftBase: placed("ricochet"), apex: placed("ricochet") } });
   const result = mustReduce(rules, start, { type: "place", handIndex: 0, slot: "rightBase" });
   const journal = result.events.filter((event) => ["removed", "knockout", "eject", "discarded", "targetEmpty", "placed"].includes(event.type)).map((event) => `${event.type}:${event.slot ?? ""}`);
   run.same(
-    "ricochet : chaque bille part, joue son Éjection en partance, éjecte la suivante ; la dernière trouve la base droite vide",
+    "ricochet : la posée arrive, puis chaque bille part, joue son Éjection en partance, éjecte la suivante ; la dernière chasse la posée",
     [
       "removed:rightBase",
+      "placed:rightBase",
       "knockout:rightBase",
       "eject:leftBase",
       "removed:leftBase",
@@ -134,16 +137,22 @@ function checkRicochet(run) {
       "eject:apex",
       "removed:apex",
       "knockout:apex",
-      "targetEmpty:rightBase",
+      "eject:rightBase",
+      "removed:rightBase",
+      "knockout:rightBase",
+      "discarded:rightBase",
       "discarded:apex",
       "discarded:leftBase",
       "discarded:rightBase",
-      "placed:rightBase",
     ],
     journal
   );
   run("ricochet : aucun enchaînement interrompu", false, result.events.some((event) => event.type === "chainInterrupted"));
-  run.same("ricochet : les trois à la défausse, la posée arrive", { discard: 3, rightBase: "plain" }, { discard: result.state.discard.length, rightBase: result.state.triangle.rightBase.marble });
+  run.same(
+    "ricochet : les quatre à la défausse, la posée la première arrivée, le triangle vide",
+    { discard: ["plain", "ricochet", "ricochet", "ricochet"], triangle: [null, null, null] },
+    { discard: result.state.discard, triangle: [result.state.triangle.rightBase, result.state.triangle.leftBase, result.state.triangle.apex] }
+  );
   run("ricochet : aucune bille perdue ni dupliquée", marbleCount(start), marbleCount(result.state));
   run("ricochet : prévision égale au réel", true, forecastMatches(rules, start, { type: "place", handIndex: 0, slot: "rightBase" }));
 }

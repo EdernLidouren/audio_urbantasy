@@ -414,6 +414,9 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
+  // Le Tic : à chaque pose sur un emplacement occupé, juste après l'arrivée de la bille
+  // posée, la délogée en partance ; avant l'Éjection de la délogée, qu'il peut
+  // rediriger (la bille éjectée, marbles/core/effects.js/KNOCKED_OUT).
   {
     id: "hit",
     field: "hit",
@@ -421,7 +424,7 @@ export const MARBLE_TRIGGERS = [
     marble: "onSlot",
     moment: "play",
     replacement: true,
-    forecast: { line: "placement", marble: "placed", order: 2 },
+    forecast: { line: "placement", marble: "placed", order: 1 },
     texts: {
       name: "marbles.keyword.hit.name",
       description: "marbles.keyword.hit.description",
@@ -461,7 +464,7 @@ export const MARBLE_TRIGGERS = [
     // d'un effet de résolution (une phase, un Final).
     moment: "anytime",
     replacement: true,
-    forecast: { line: "placement", marble: "occupant", order: 1 },
+    forecast: { line: "placement", marble: "occupant", order: 2 },
     texts: {
       name: "marbles.keyword.knockout.name",
       description: "marbles.keyword.knockout.description",

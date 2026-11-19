@@ -51,6 +51,9 @@ function checkPocket(run) {
     });
   // Toutes les billes de la partie, pot et billes perdues comprises.
   const everywhere = (state) => marbleCount(state);
+  // Le journal sans la délogée (aging_flick) : son Éjection et son arrivée suivent
+  // le Tic de la posée.
+  const withoutOccupant = (events) => journal(events).filter((entry) => !entry.includes("aging_flick"));
 
   // Sans réglage donné, la capacité est celle des réglages du jeu.
   run("pot : capacité de départ, celle de la définition", FIXTURE_DEFINITION.start.potCapacity, rules.characteristic(rules.createGame(1), "potCapacity"));
@@ -64,7 +67,7 @@ function checkPocket(run) {
   run.same(
     "Empocher, depuis la main : la mise en poche, puis l'entrée",
     ["effect:hit:hit_pocket", "pocketed:fragile:hand", "effect:pocketEntry:fragile"],
-    journal(hitPocket.events).slice(-3)
+    withoutOccupant(hitPocket.events).slice(-3)
   );
   run.same("Empocher, depuis la main : le pot, la main", { pot: ["fragile"], hand: ["aging_flick"] }, { pot: hitPocket.state.pot, hand: handIds(hitPocket.state) });
   run("Empocher, depuis la main : l'entrée aux compteurs du tour (4 + 10)", 14, hitPocket.state.speed);
@@ -85,14 +88,14 @@ function checkPocket(run) {
   );
   // Main vide : sans effet, noté.
   const emptyHand = apply(playState({ hand: inHand(["hit_pocket"]), triangle: triangleOf(null, null, placed("aging_flick")) }), { type: "place", handIndex: 0, slot: "apex" });
-  run("Empocher, main vide : noté", "targetEmpty:pocket:firstInHand", journal(emptyHand.events).at(-1));
+  run("Empocher, main vide : noté", "targetEmpty:pocket:firstInHand", withoutOccupant(emptyHand.events).at(-1));
 
   // Pot plein : la bille est perdue, sans effet d'entrée.
   const full = apply(
     playState({ hand: inHand(["hit_pocket", "fragile"]), triangle: triangleOf(null, null, placed("aging_flick")), pot: ["aging_flick", "hit_polish", "awaken_draw"] }),
     { type: "place", handIndex: 0, slot: "apex" }
   );
-  run.same("pot plein : la bille perdue, sans effet d'entrée", ["effect:hit:hit_pocket", "lost:fragile:hand"], journal(full.events).slice(-2));
+  run.same("pot plein : la bille perdue, sans effet d'entrée", ["effect:hit:hit_pocket", "lost:fragile:hand"], withoutOccupant(full.events).slice(-2));
   run.same("pot plein : pot inchangé, la bille chez les perdues", { pot: ["aging_flick", "hit_polish", "awaken_draw"], lost: ["fragile"] }, { pot: full.state.pot, lost: full.state.lost });
   run("pot plein : ni entrée ni Vitesse +10", 4, full.state.speed);
   const zero = apply(
@@ -144,7 +147,7 @@ function checkPocket(run) {
   const ejected = apply(playState({ hand: inHand(["plain"]), triangle: triangleOf(null, null, placed("shy")) }), { type: "place", handIndex: 0, slot: "apex" }, shy);
   run.same(
     "Empocher, sa propre Éjection : au pot, jamais à la défausse",
-    ["flick:plain", "removed:shy:replacement", "knockout:shy", "effect:knockout:shy", "redirected:shy", "pocketed:shy:triangle", "placed:plain", "hit:plain"],
+    ["flick:plain", "removed:shy:replacement", "placed:plain", "hit:plain", "knockout:shy", "effect:knockout:shy", "redirected:shy", "pocketed:shy:triangle"],
     journal(ejected.events)
   );
   run.same("Empocher, sa propre Éjection : le pot, une défausse vide", { pot: ["shy"], discard: [] }, { pot: ejected.state.pot, discard: ejected.state.discard });

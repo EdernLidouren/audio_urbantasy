@@ -171,7 +171,9 @@ function checkChoices(run) {
   run("transit : ni en main ni sur le triangle", false, inPot.state.hand.some((held) => held.marble === "flicker") || Object.values(inPot.state.triangle).some((slot) => slot?.marble === "flicker"));
   run("transit : jamais une cible", false, inPot.state.pendingChoice.eligible.some((target) => target.marble === "flicker"));
   run.same("transit : un aller-retour JSON ne change rien", inPot.state, JSON.parse(JSON.stringify(inPot.state)));
-  run.same("transit : aucune au Tic, la bille déjà posée", [], opened.state.pendingChoice.inTransit);
+  // Au Tic, la posée est arrivée ; la délogée, elle, est en partance jusqu'à son
+  // Éjection, qui joue après.
+  run.same("transit : au Tic, la posée arrivée, la délogée en partance", [{ kind: "leaving", marble: "plain", slot: "apex" }], opened.state.pendingChoice.inTransit);
   run.same("transit : pendant un Final, la bille en partance, depuis son emplacement", [{ kind: "leaving", marble: "finalChooser", slot: "apex" }], suspended.state.pendingChoice.inTransit);
   run("transit : en partance, jamais une cible", false, suspended.state.pendingChoice.eligible.some((target) => target.marble === "finalChooser"));
   const reachedChoice = (state) => state.pendingChoice?.inTransit ?? null;
@@ -252,15 +254,16 @@ function checkEject(run) {
   const toLeft = { type: "place", handIndex: 0, slot: "leftBase" };
 
   // Un emplacement : le départ de la visée, son Éjection en partance, son arrivée à
-  // la défausse ; ni Tic ni Final.
+  // la défausse ; ni Tic ni Final. Pendant le Tic qui éjecte, la délogée par la pose
+  // est en partance : son Éjection et son arrivée suivent.
   const fixed = go(playState({ hand: inHand(["apexEjector"]), triangle: triangleOf(placed("plain"), null, placed("smallKnock")) }), toLeft);
   run.same(
-    "éjecter, emplacement : départ, Éjection, défausse",
-    ["eject:smallKnock", "removed:smallKnock:eject", "knockout:smallKnock", "effect:knockout:smallKnock", "discarded:smallKnock:eject"],
+    "éjecter, emplacement : départ, Éjection, défausse, puis l'Éjection et l'arrivée de la délogée",
+    ["eject:smallKnock", "removed:smallKnock:eject", "knockout:smallKnock", "effect:knockout:smallKnock", "discarded:smallKnock:eject", "knockout:plain", "discarded:plain:replacement"],
     journal(fixed.events).slice(journal(fixed.events).indexOf("eject:smallKnock"))
   );
   run("éjecter : la pointe vidée", null, fixed.state.triangle.apex);
-  run("éjecter : la bille à la défausse", "plain,smallKnock", fixed.state.discard.join());
+  run("éjecter : la bille à la défausse, avant la délogée", "smallKnock,plain", fixed.state.discard.join());
   run("éjecter : ni Final ni Tic de plus", 1, fixed.events.filter((event) => event.type === "hit").length);
   run("éjecter : pas de Final", false, fixed.events.some((event) => event.type === "final"));
   run("éjecter : son Éjection compte au tour (Vitesse +2)", 2, fixed.state.speed);
@@ -290,7 +293,8 @@ function checkEject(run) {
   run("validation, condition imprimée : sur Éjecter refusée", true, printedOn("eject"));
   run("validation, condition imprimée : sur la Fêlure permise", false, printedOn("crack"));
 
-  // Un choix pendant une Éjection ne propose jamais l'emplacement de la bille qui part.
+  // Un choix pendant une Éjection ne propose jamais la bille qui part ; pendant celle
+  // d'un remplacement, la bille posée est déjà arrivée (son Tic a joué) : elle l'est.
   const leaving = fabricatedRules({
     k: { knockout: [{ action: "eject", target: { type: "choice", zones: ["triangle"], pick: "marble", count: 1, mode: "required" } }] },
     p: {},
@@ -299,7 +303,8 @@ function checkEject(run) {
     { ...leaving.createGame(1, { bag: ["p"] }), stage: "play", bag: [], hand: [{ marble: "p", turnsInHand: 0 }], triangle: { leftBase: { marble: "k", wear: 0 }, rightBase: { marble: "p", wear: 0 }, apex: null } },
     { type: "place", handIndex: 0, slot: "leftBase" }
   ).state;
-  run.same("choix pendant une Éjection : l'emplacement de la bille qui part n'est pas éligible", ["rightBase"], replacing.pendingChoice.eligible.map((target) => target.slot));
+  run.same("choix pendant une Éjection : la bille qui part n'est pas éligible, la posée l'est", ["rightBase", "leftBase"], replacing.pendingChoice.eligible.map((target) => target.slot));
+  run("choix pendant une Éjection : la posée, sur l'emplacement quitté", "p", replacing.triangle.leftBase.marble);
   run("validation, « toutes » : sans filtre permis", false, refused("hit", { action: "eject", target: { type: "all" } }));
 
   // Toutes les minibilles actives : dans l'ordre horaire, seulement elles.

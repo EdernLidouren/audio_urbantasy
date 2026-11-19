@@ -480,18 +480,23 @@ function checkTexts(run) {
       "forecast.awakenings",
       t(...(({ key, params }) => [key, params])(placementLines({ ...drawing, bag: ["all_rounder"] }, 0, "apex", rules, t).at(-2)))
     );
+    // Le Tic pioche le sac (final_pocket) ; puis l'Éjection de size_count, sac vide,
+    // régénère la défausse d'avant la pose (fragile), la délogée étant en partance ;
+    // la base d'awaken_draw, à la résolution, régénère encore (size_count, arrivée).
+    const drawingRegen = { ...drawing, discard: ["fragile"] };
     run.same(
-      "pioche, confirmation : Éjection et Tic qui piochent, puis la régénération",
+      "pioche, confirmation : Tic et Éjection qui piochent, puis la régénération",
       [
         "place.question{marble: <split_base>, slot: slot.apex}",
         "place.values{effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.flick{marble: <split_base>, effect: effect.none}",
-        "place.knockout{marble: <size_count>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
         "place.hit{marble: <split_base>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
+        "place.knockout{marble: <size_count>, effect: effect.combined{parts: [effect.draw{amount: 1}]}}",
         "forecast.regenerates",
+        "forecast.regenerates_again",
         "place.pot{reactions: effect.none}",
       ],
-      placementLines(drawing, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
+      placementLines(drawingRegen, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
     );
     run.same(
       "pioche, séquence : la Pioche de la phase, puis la bille",
@@ -502,17 +507,17 @@ function checkTexts(run) {
       ],
       texts(drawing).slice(0, 3)
     );
-    const placedEvents = rules.reduce(drawing, { type: "place", handIndex: 0, slot: "apex" }).events;
+    const placedEvents = rules.reduce(drawingRegen, { type: "place", handIndex: 0, slot: "apex" }).events;
     run.same(
       "pioche, pose : les billes piochées en cours de tour se disent, régénération comprise",
       [
-        "event.effect_knockout{marble: <size_count>, effect: effect.combined{parts: [effect.draw{amount: 1}]}, speed: 0, mass: 1}",
-        "event.draw{marbles: [<final_pocket>]}",
-        "event.discarded.replacement{marble: <size_count>}",
         "event.placed{marble: <split_base>, slot: slot.apex}",
         "event.effect_hit{marble: <split_base>, effect: effect.combined{parts: [effect.draw{amount: 1}]}, speed: 0, mass: 1}",
+        "event.draw{marbles: [<final_pocket>]}",
+        "event.effect_knockout{marble: <size_count>, effect: effect.combined{parts: [effect.draw{amount: 1}]}, speed: 0, mass: 1}",
         "event.bag_regenerated{size: 1}",
-        "event.draw{marbles: [<size_count>]}",
+        "event.draw{marbles: [<fragile>]}",
+        "event.discarded.replacement{marble: <size_count>}",
       ],
       buildSteps(placedEvents, t).map((step) => step.text)
     );
@@ -616,8 +621,8 @@ function checkTexts(run) {
       t(...(({ key, params }) => [key, params])(placementLines(ejecting, 0, "apex", rules, t)[2]))
     );
     run(
-      "Éjecter, confirmation : ni Éjection par la pose, ni Tic",
-      "place.knockout{marble: <tally_flick>, effect: effect.none} ; place.hit{marble: <flick_strike>, effect: effect.none}",
+      "Éjecter, confirmation : ni Tic, ni Éjection par la pose",
+      "place.hit{marble: <flick_strike>, effect: effect.none} ; place.knockout{marble: <tally_flick>, effect: effect.none}",
       placementLines(ejecting, 0, "apex", rules, t).slice(3, 5).map(({ key, params }) => t(key, params)).join(" ; ")
     );
     run.same(
@@ -661,15 +666,16 @@ function checkTexts(run) {
     const reacting = playState({ hand: inHand(["aging_flick"]), pot: ["size_count", "all_rounder"], triangle: { ...EMPTY_TRIANGLE, apex: { marble: "hit_polish", wear: 0 } } });
     const reactingPlace = rules.reduce(reacting, { type: "place", handIndex: 0, slot: "apex" });
     run.same(
-      "réaction, pose dite : la Chiquenaude puis all_rounder, l'éjection puis size_count",
+      "réaction, pose dite : la Chiquenaude puis all_rounder, la pose et son Tic, l'éjection puis size_count",
       [
         "event.effect_flick{marble: <aging_flick>, effect: effect.none, speed: 0, mass: 1}",
         "outcome.pot{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, speed: 2, mass: 1}",
-        "outcome.pot{marble: <size_count>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}, speed: 2, mass: 2}",
-        "event.discarded.replacement{marble: <hit_polish>}",
         "event.placed{marble: <aging_flick>, slot: slot.apex}",
+        "event.effect_hit{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, speed: 4, mass: 1}",
+        "outcome.pot{marble: <size_count>, effect: effect.combined{parts: [effect.mass_up{amount: 1}]}, speed: 4, mass: 2}",
+        "event.discarded.replacement{marble: <hit_polish>}",
       ],
-      buildSteps(reactingPlace.events, t).map((step) => step.text).slice(0, 5)
+      buildSteps(reactingPlace.events, t).map((step) => step.text).slice(0, 6)
     );
     run(
       "réaction, confirmation : la ligne du pot, par bille, avant Annuler",
@@ -802,21 +808,21 @@ function checkTexts(run) {
       "chiquenaude, confirmation : la valeur calculée, dans l'ordre réel",
       [
         "place.flick{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}",
-        "place.knockout{marble: <all_rounder>, effect: effect.none}",
         "place.hit{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}",
+        "place.knockout{marble: <all_rounder>, effect: effect.none}",
         "place.pot{reactions: effect.none}",
       ],
       placementLines(flicking, 0, "apex", rules, t).map(({ key, params }) => t(key, params)).slice(2)
     );
     const clearing = playState({ hand: inHand(["flick_strike"]), triangle: { ...EMPTY_TRIANGLE, apex: { marble: "aging_flick", wear: 0 } } });
     run.same(
-      "chiquenaude, confirmation : l'emplacement vidé par Éjecter, ni Éjection par la pose ni Tic",
+      "chiquenaude, confirmation : l'emplacement vidé par Éjecter, ni Tic ni Éjection par la pose",
       [
         "place.question{marble: <flick_strike>, slot: slot.apex}",
         "place.values{effect: effect.combined{parts: [effect.speed_down{amount: 3}]}}",
         "place.flick{marble: <flick_strike>, effect: pocket.then{effect: effect.combined{parts: [effect.eject_slot{slot: slot.apex}]}, pockets: effect.combined{parts: [eject.ejected{marble: <aging_flick>}]}}}",
-        "place.knockout{marble: <aging_flick>, effect: effect.none}",
         "place.hit{marble: <flick_strike>, effect: effect.none}",
+        "place.knockout{marble: <aging_flick>, effect: effect.none}",
         "place.pot{reactions: effect.none}",
       ],
       placementLines(clearing, 0, "apex", rules, t).map(({ key, params }) => t(key, params))
@@ -849,15 +855,16 @@ function checkTexts(run) {
       placementLines(windfalls, 0, "apex", rules, t).map(({ key, params }) => t(key, params)).slice(-4, -1)
     );
     run.same(
-      "trouvaille, pose dite : la régénération, puis les trouvailles, puis la pioche",
+      "trouvaille, pose dite : la régénération, puis les trouvailles, puis la pioche, puis l'arrivée de la délogée",
       [
-        "event.bag_regenerated{size: 2}",
+        "event.bag_regenerated{size: 1}",
         "event.effect_windfall{marble: <final_pocket>, effect: effect.combined{parts: [effect.polish{amount: 1}]}, speed: 0, mass: 1}",
         "event.polished{marble: <final_pocket>, wear: 0, maxWear: 3}",
         "event.effect_windfall{marble: <all_rounder>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 1}",
         "event.draw{marbles: [<aging_flick>]}",
+        "event.discarded.replacement{marble: <hit_polish>}",
       ],
-      buildSteps(rules.reduce(windfalls, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => step.text).slice(-5)
+      buildSteps(rules.reduce(windfalls, { type: "place", handIndex: 0, slot: "apex" }).events, t).map((step) => step.text).slice(-6)
     );
     const resolvingWindfall = playState({
       hand: inHand([]),
@@ -939,8 +946,8 @@ function checkTexts(run) {
       "calibre, confirmation : le Tic de hit_pocket, sa valeur finale",
       [
         "place.flick{marble: <hit_pocket>, effect: effect.none}",
-        "place.knockout{marble: <fragile>, effect: effect.none}",
         "place.hit{marble: <hit_pocket>, effect: forecast_empty.after{effect: effect.combined{parts: [effect.speed_up{amount: 4} | effect.pocket_choice{target: choice.noun.hand_marble{count: 1}}]}, empty: effect.combined{parts: [forecast_empty.choice]}}}",
+        "place.knockout{marble: <fragile>, effect: effect.none}",
         "place.pot{reactions: effect.none}",
       ],
       placementLines(sized, 0, "rightBase", rules, t).map(({ key, params }) => t(key, params)).slice(2)
@@ -948,7 +955,7 @@ function checkTexts(run) {
     run(
       "Empocher, confirmation : l'entrée au pot prévue, chez le Tic qui empoche",
       "place.hit{marble: <hit_pocket>, effect: pocket.then{effect: effect.combined{parts: [effect.speed_up{amount: 4} | effect.pocket_hand]}, pockets: effect.combined{parts: [pocket.entered_effect{marble: <fragile>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}]}}}",
-      t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["hit_pocket", "fragile"]) }, 0, "rightBase", fixedRules, t).at(-2)))
+      t(...(({ key, params }) => [key, params])(placementLines({ ...sized, hand: inHand(["hit_pocket", "fragile"]) }, 0, "rightBase", fixedRules, t).at(-3)))
     );
     const boulderLeft = { ...sized, triangle: { ...sized.triangle, leftBase: { marble: "one_shot", wear: 0 } } };
     run(

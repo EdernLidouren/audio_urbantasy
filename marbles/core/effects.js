@@ -180,6 +180,13 @@ export const FIRST_IN_HAND = "firstInHand";
 // La cible « la dernière bille arrivée à la défausse » (Ramasser).
 export const LAST_DISCARDED = "lastDiscarded";
 
+// La cible « LA BILLE ÉJECTÉE » (Empocher, Rebond), dans un Tic seulement : la bille
+// que la pose déloge, EN PARTANCE pendant le Tic (il joue avant son Éjection). Une
+// action qui la vise la REDIRIGE (marbles/core/path.js/redirect) : vers le pot,
+// vers la main. Son Éjection joue ensuite, et peut la rediriger à son tour : la
+// dernière redirection l'emporte.
+export const KNOCKED_OUT = "knockedOut";
+
 // Une cible est-elle « les N prochaines billes du sac », { type: "bag", count }
 // (Défausser) ? Elles partent du haut du sac, une par une, sans être révélées
 // avant ; un sac qui en a moins donne ce qu'il a, sans régénération.
@@ -426,8 +433,9 @@ export const CLAUSE_ACTIONS = {
   // qu'elle soit (sur le triangle, en main à son Éveil, en partance pendant son
   // Final ou son Éjection, ce qui REDIRIGE sa destination, à la défausse pendant sa
   // Chute) ; un emplacement ; la
-  // première bille de la main (FIRST_IN_HAND). Pot plein : la bille est perdue. Cible
-  // vide : sans effet, noté au journal.
+  // première bille de la main (FIRST_IN_HAND) ; dans un Tic, la bille éjectée
+  // (KNOCKED_OUT), redirigée. Pot plein : la bille est perdue. Cible vide : sans
+  // effet, noté au journal.
   // Mot-clé : un déclenchement par application, cible vide comprise (une
   // redirection, `redirected`, en est une, et l'arrivée qui la suit ne se recompte
   // pas) ; sa quantité réelle, les billes réellement arrivées au pot ou perdues.
@@ -436,7 +444,7 @@ export const CLAUSE_ACTIONS = {
     fields: ["action", "target", "when"],
     validate() {},
     amountless: true,
-    targets: [...SLOTS, FIRST_IN_HAND],
+    targets: [...SLOTS, FIRST_IN_HAND, KNOCKED_OUT],
     moves: "pot",
     // Une bille de la main ou une bille active ; un emplacement vide n'a rien à
     // empocher.
@@ -515,8 +523,8 @@ export const CLAUSE_ACTIONS = {
   // la place, et sa Chute joue. Cible : la bille elle-même (sur le triangle, ou en
   // partance pendant son Final ou son Éjection, ce qui REDIRIGE sa destination) ;
   // un emplacement ; des billes actives au choix ; toutes les billes actives,
-  // filtrées. Depuis le triangle, ni Final ni Éjection ; une phase qui n'avait pas
-  // eu lieu est sautée.
+  // filtrées ; dans un Tic, la bille éjectée (KNOCKED_OUT), redirigée. Depuis le
+  // triangle, ni Final ni Éjection ; une phase qui n'avait pas eu lieu est sautée.
   // Mot-clé : un déclenchement par bille visée, cible vide comprise (une
   // redirection en est une) ; sa quantité réelle, les billes réellement déplacées
   // par lui, en main ou, main pleine, à la défausse.
@@ -525,7 +533,7 @@ export const CLAUSE_ACTIONS = {
     fields: ["action", "target", "when"],
     validate() {},
     amountless: true,
-    targets: SLOTS,
+    targets: [...SLOTS, KNOCKED_OUT],
     moves: "hand",
     choice: { zones: ["triangle"], picks: ["marble"] },
     all: true,
@@ -607,6 +615,8 @@ function targetProblem(clause, context) {
     const { zone, where } = holderZoneOf(context);
     if (!action.selfZones.includes(zone)) return `l'action "${clause.action}" ne peut pas viser la bille elle-même ici : ${where}`;
   }
+  // La bille éjectée n'existe, en partance, que pendant le Tic de celle qui la déloge.
+  if (clause.target === KNOCKED_OUT && context.trigger !== "hit") return "la bille éjectée ne se vise que dans un Tic";
   // Un bonus au choix : il faut qu'au moins une phase puisse encore le recevoir.
   if (action.kind === "value" && isChoice(clause.target)) {
     if (context.moment === "afterPhases") return "un bonus au choix n'a plus aucune phase à modifier : rien ne peut être choisi";

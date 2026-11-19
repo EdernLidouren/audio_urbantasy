@@ -25,6 +25,7 @@ import { createEventBus } from "./bus.js";
 import {
   CLAUSE_ACTIONS,
   FIRST_IN_HAND,
+  KNOCKED_OUT,
   LAST_DISCARDED,
   NO_REFERENCE,
   UNKNOWN_MARBLE,
@@ -336,7 +337,7 @@ function fireEffect(run, trigger, listener, clauses, event) {
   for (const change of [speedChange, massChange, drawChange, ...amountChanges]) noteModification(run, change, by);
   if (draw > 0) drawMarbles(run, draw, "effect");
   // Les actions sur une bille, après la pioche, dans l'ordre des clauses.
-  for (const operation of operations) applyOperation(run, operation, listener, by);
+  for (const operation of operations) applyOperation(run, operation, listener, by, situation.replacement);
 }
 
 // Les QUANTITÉS d'un effet passées par les statuts, dans l'ordre des clauses : le total
@@ -430,9 +431,11 @@ export function noteModification(run, change, by) {
 //   « toutes » (Éjecter, Défausser) : les billes actives filtrées (actOnAll) ;
 //   le sac (Défausser) : les N prochaines billes du sac (moveFromBag) ;
 //   LAST_DISCARDED (Ramasser) : la dernière bille arrivée à la défausse ;
+//   KNOCKED_OUT (Empocher, Rebond, dans un Tic) : la bille éjectée de `replacement`,
+//   le remplacement en cours, en partance : redirigée (marbles/core/path.js/redirect) ;
 //   un emplacement : sa bille (actOnSlot).
 // Sans bille à prendre : sans effet, noté au journal (targetEmpty).
-function applyOperation(run, operation, holder, by) {
+function applyOperation(run, operation, holder, by, replacement = null) {
   const { action, amount, target } = operation;
   // Une cible relative sans emplacement de référence (une Chute depuis la main) : sans
   // effet, noté au journal, à sa place parmi les clauses.
@@ -443,6 +446,10 @@ function applyOperation(run, operation, holder, by) {
   else if (target === FIRST_IN_HAND) {
     if (run.state.hand.length === 0) run.emit({ type: "targetEmpty", action, slot: null, target, by });
     else moveFromHand(run, 0, action, by);
+  } else if (target === KNOCKED_OUT) {
+    // Toujours en partance pendant le Tic ; introuvable (aucun remplacement), noté.
+    const ejected = replacement?.ejected;
+    if (ejected === undefined || !redirect(run, ejected, CLAUSE_ACTIONS[action].moves, action, by)) run.emit({ type: "targetEmpty", action, slot: null, target, by });
   } else if (target === LAST_DISCARDED) {
     if (run.state.discard.length === 0) run.emit({ type: "targetEmpty", action, slot: null, target, by });
     else moveFromDiscard(run, run.state.discard.length - 1, action, by);

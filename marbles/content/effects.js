@@ -61,6 +61,11 @@ export const FIRST_IN_HAND = "firstInHand";
 // (marbles/core/effects.js/LAST_DISCARDED).
 export const LAST_DISCARDED = "lastDiscarded";
 
+// La bille éjectée, en partance pendant le Tic de celle qui la déloge, cible
+// d'Empocher et de Rebond dans un Tic seulement (marbles/core/effects.js/
+// KNOCKED_OUT) : « Tic : Empocher la bille éjectée » la redirige vers le pot.
+export const KNOCKED_OUT = "knockedOut";
+
 // Les CIBLES RELATIVES (marbles/core/effects.js) : l'emplacement suivant, ou
 // précédent, de celui d'où la bille agit. Partout où une action accepte un
 // emplacement, et dans le `slot` des conditions qui lisent un emplacement :

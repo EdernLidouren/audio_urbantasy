@@ -164,7 +164,7 @@ export function rotationPath(origin, notches) {
 // juste après l'action, pour l'échange, dont l'évènement ne nomme que les
 // emplacements ; `nextDrawPlace()`, la place dans la main de la bille piochée
 // suivante ; `placeFrom`, la place dans la main de la bille posée ; `struck`, la
-// bille délogée par la pose en cours, que le journal dit AVANT la pose.
+// bille délogée par la pose en cours, dont le journal dit le départ AVANT la pose.
 export const MARBLE_EVENT_CUES = {
   turnStarted: null,
   draw: (event, timeline, context) => timeline.draw(event.marble, context.nextDrawPlace()),
@@ -198,13 +198,15 @@ export const MARBLE_EVENT_CUES = {
   windfall: (event, timeline, context, settings, table) => {
     if (hasTriggerEffect(table, event.marble, "windfall")) timeline.trigger("windfall", event.marble, slotPlace(event.slot));
   },
-  // L'Éjection d'un REMPLACEMENT (une pose sur un emplacement occupé) : la bille
-  // délogée part avec le choc de la pose qui suit. Une Éjection provoquée par l'action
-  // Éjecter (`by`) n'a pas de pose : sa bille roule à la défausse à son arrivée.
-  knockout: (event, timeline, context) => {
-    if (event.by === undefined) context.struck = event.marble;
+  // Le départ d'une bille délogée par un REMPLACEMENT (une pose sur un emplacement
+  // occupé), dit avant l'arrivée de la bille posée : elle part avec le choc de la
+  // pose qui suit. Chassée par l'action Éjecter, elle n'a pas de pose : elle roule à
+  // la défausse à son arrivée. Son Éjection, qui joue après le Tic, n'a pas de son à
+  // elle.
+  knockout: null,
+  removed: (event, timeline, context) => {
+    if (event.cause === "replacement") context.struck = event.marble;
   },
-  removed: null,
   // Une redirection : un point d'accroche muet, l'arrivée a son son.
   redirected: null,
   // Une bille arrivée en main (Rebond, Ramasser) roule de là où elle était (son

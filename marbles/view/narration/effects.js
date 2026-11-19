@@ -16,6 +16,7 @@ import {
   CLAUSE_ACTIONS,
   CONDITIONS,
   FIRST_IN_HAND,
+  KNOCKED_OUT,
   LAST_DISCARDED,
   TARGET_FILTERS,
   amountOf,
@@ -117,7 +118,13 @@ const ACTION_TEXTS = {
   // bille au choix (`choice`, qui reçoit {target}).
   pocket: {
     up: "marbles.effect.pocket_self",
-    targets: { slot: "marbles.effect.pocket_slot", relative: "marbles.effect.pocket_relative", [FIRST_IN_HAND]: "marbles.effect.pocket_hand", choice: "marbles.effect.pocket_choice" },
+    targets: {
+      slot: "marbles.effect.pocket_slot",
+      relative: "marbles.effect.pocket_relative",
+      [FIRST_IN_HAND]: "marbles.effect.pocket_hand",
+      [KNOCKED_OUT]: "marbles.effect.pocket_knocked_out",
+      choice: "marbles.effect.pocket_choice",
+    },
   },
   // Sans montant, comme Empocher ; « toutes » (`all`) reçoit {target}, le sac
   // (`bag`) reçoit {count}.
@@ -132,10 +139,17 @@ const ACTION_TEXTS = {
       bag: "marbles.effect.discard_bag",
     },
   },
-  // Sans montant ; la bille elle-même, un emplacement, un choix, « toutes ».
+  // Sans montant ; la bille elle-même, un emplacement, un choix, « toutes », la
+  // bille éjectée (dans un Tic).
   bounce: {
     up: "marbles.effect.bounce_self",
-    targets: { slot: "marbles.effect.bounce_slot", relative: "marbles.effect.bounce_relative", choice: "marbles.effect.bounce_choice", all: "marbles.effect.bounce_all" },
+    targets: {
+      slot: "marbles.effect.bounce_slot",
+      relative: "marbles.effect.bounce_relative",
+      [KNOCKED_OUT]: "marbles.effect.bounce_knocked_out",
+      choice: "marbles.effect.bounce_choice",
+      all: "marbles.effect.bounce_all",
+    },
   },
   // Sans montant ; jamais la bille elle-même : la dernière arrivée à la défausse, ou
   // un choix.
@@ -239,7 +253,7 @@ function actionText(action, amount, target, t) {
     if (isBag(target)) return t(targets.bag, { count: target.count });
     // Relative : « Éjecter la bille de l'emplacement suivant ».
     if (isRelative(target)) return t(targets.relative, { relative: relativeWord(target) });
-    if (target === FIRST_IN_HAND || target === LAST_DISCARDED) return t(targets[target]);
+    if (target === FIRST_IN_HAND || target === LAST_DISCARDED || target === KNOCKED_OUT) return t(targets[target]);
     return t(targets.slot, { slot: slotName(target, t) });
   }
   const text = t(up, { amount });
@@ -297,6 +311,7 @@ function emptyPart({ slot, target, marble }, t) {
   if (target === "self") return t("marbles.forecast_empty.self", { marble: marbleRef(marble) });
   if (target === "bag") return t("marbles.forecast_empty.bag");
   if (target === LAST_DISCARDED) return t("marbles.forecast_empty.discard");
+  if (target === KNOCKED_OUT) return t("marbles.forecast_empty.knocked_out");
   if (target === "handFull") return t("marbles.forecast_empty.hand_full");
   if (target === "noReference") return t("marbles.forecast_empty.no_reference");
   return t("marbles.forecast_empty.slot", { slot: slotName(slot, t) });

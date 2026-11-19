@@ -22,6 +22,9 @@ export function handRoom(run) {
 //      n'appartient plus à aucune zone : ni active, ni en main, ni à la défausse,
 //      pour toutes les règles (conditions, montants, cibles, régénération du sac).
 //      Depuis le triangle, `removed` le dit, avec sa cause.
+//      Un REMPLACEMENT intercale ici l'arrivée de la bille posée et son Tic
+//      (`meanwhile`) : le Tic joue pendant que la délogée est en partance, et peut
+//      donc la rediriger (Empocher, Rebond « la bille éjectée »).
 //   2. DÉCLENCHEUR DE SORTIE, s'il y en a un : le Final (usure) ou l'Éjection
 //      (remplacement, Éjecter), une INTERRUPTION (run.settle) réglée jusqu'au bout.
 //      La bille y est "leaving" (marbles/core/effects.js/HOLDER_ZONES) : une action
@@ -79,11 +82,15 @@ function originFields(from) {
 //                une action qui déplace pose la sienne (CLAUSE_ACTIONS, `moves`) ;
 //   by           (facultatif) l'effet qui la déplace, que porte son arrivée ;
 //   movedBy      (facultatif) l'action qui la déplace (Empocher, Défausser,
-//                Rebond, Ramasser), que porte son arrivée : ses compteurs la lisent.
-export function travel(run, { marble, from, cause, exit = null, destination = "discard", by = null, movedBy = null }) {
+//                Rebond, Ramasser), que porte son arrivée : ses compteurs la lisent ;
+//   meanwhile    (facultatif) ce qui se passe entre son départ et son déclencheur de
+//                sortie, elle en partance : l'arrivée de la bille posée et son Tic,
+//                pour un remplacement (marbles/core/marbles.js/placeMarble).
+export function travel(run, { marble, from, cause, exit = null, destination = "discard", by = null, movedBy = null, meanwhile = null }) {
   const departure = ORIGINS[from.zone](run, from, marble, cause);
   const moving = { kind: "leaving", marble, slot: from.slot ?? null, destination, by, movedBy, redirected: false };
   run.inTransit = [...run.inTransit, moving];
+  if (meanwhile !== null) meanwhile();
   if (exit !== null) run.settle(exit);
   // Les réactions au départ (un départ du triangle), après le déclencheur de sortie :
   // la bille concernée joue d'abord son effet.
@@ -94,8 +101,10 @@ export function travel(run, { marble, from, cause, exit = null, destination = "d
 
 // Redirige la bille EN PARTANCE `marble` (la plus récente de ce nom) vers
 // `destination`, par l'effet `by` : `redirected` le note, un déclenchement de
-// l'action `action`. La dernière redirection l'emporte. -> vrai si une bille en
-// partance a été trouvée.
+// l'action `action`. Deux effets peuvent le faire : celui de la bille elle-même
+// (son Final, son Éjection), et le Tic de la bille qui la déloge (« la bille
+// éjectée »), qui joue AVANT son Éjection. La dernière redirection l'emporte. -> vrai
+// si une bille en partance a été trouvée.
 export function redirect(run, marble, destination, action, by) {
   const moving = run.inTransit.findLast((other) => other.kind === "leaving" && other.marble === marble);
   if (moving === undefined) return false;

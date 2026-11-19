@@ -781,9 +781,10 @@ function checkChoiceInterface(run) {
     "choice.by_hit{marble: <picker>, question: choice.question.required{target: choice.noun.discard_marble{count: 1}, verb: choice.verb.retrieve{effect: undefined}}}",
     describeChoicePrompt(fromDiscard, t)
   );
-  run.same("défausse : le menu, dans l'ordre d'arrivée, la remplacée en dernier", ["plain", "booster", "plain"], choiceHandOptions(fromDiscard).map((option) => option.marble));
+  // Au Tic, la remplacée est en partance : elle n'est pas encore à la défausse.
+  run.same("défausse : le menu, dans l'ordre d'arrivée, sans la remplacée en partance", ["plain", "booster"], choiceHandOptions(fromDiscard).map((option) => option.marble));
   run.same("défausse : le curseur s'y ouvre", { place: "hand", handIndex: 0 }, (({ place, handIndex }) => ({ place, handIndex }))(choiceStartCursor(fromDiscard, cursor("apex"))));
-  run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 2, total: 3}", choiceFocusLine(picking, cursor("hand", 1), made, t));
+  run("défausse : la position dans le menu", "list.line{name: <booster>, size: size.medium.name, families: [family.classics.name], rarity: rarity.common.name, maxWear: 3}. menu.position{index: 2, total: 2}", choiceFocusLine(picking, cursor("hand", 1), made, t));
   run.same("défausse : Entrée répond par la place dans la défausse", { type: "choose", target: { zone: "discard", index: 1 } }, choiceAnswer(fromDiscard, cursor("hand", 1)).action);
   run.same("défausse : la fiche de la bille sous le curseur", { marble: "booster", turnsInHand: 0 }, (({ marble, turnsInHand }) => ({ marble, turnsInHand }))(choiceListEntry(picking, choiceHandOptions(picking.pendingChoice)[1])));
   run("défausse seule : pas de triangle", null, stepChoiceCursor(fromDiscard, cursor("hand"), "up"));
@@ -833,11 +834,15 @@ function checkChoiceInterface(run) {
   run("choix, dit : une bille choisie", "choice.chosen{marble: <final_pocket>}", t("marbles.choice.chosen", { marble: nameRef("marble.final_pocket.name") }));
   run("choix, dit : un hit_pocket choisi", "choice.chosen{marble: <hit_pocket>}", t("marbles.choice.chosen", { marble: nameRef("marble.hit_pocket.name") }));
   run(
-    "choix, dit : la réponse de hit_pocket",
-    "choice.chosen{marble: <final_pocket>} event.pocketed{marble: <final_pocket>}",
+    "choix, dit : la réponse de hit_pocket, puis l'arrivée de la délogée",
+    "choice.chosen{marble: <final_pocket>} event.pocketed{marble: <final_pocket>} event.discarded.replacement{marble: <aging_flick>}",
     stepsText(buildSteps(rules.reduce(hitPocket, { type: "choose", target: { zone: "hand", index: 1 } }).events, t))
   );
-  run("choix, dit : rien de choisi, l'action ignorée", "choice.ended.declined", stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t)));
+  run(
+    "choix, dit : rien de choisi, l'action ignorée, puis l'arrivée de la délogée",
+    "choice.ended.declined event.discarded.replacement{marble: <plain>}",
+    stepsText(buildSteps(made.reduce(upTo, { type: "choose", done: true }).events, t))
+  );
   const doneAfterOne = made.reduce(made.reduce(upTo, { type: "choose", target: { zone: "triangle", slot: "leftBase" } }).state, { type: "choose", done: true });
   run("choix, dit : Terminer après une cible", true, stepsText(buildSteps(doneAfterOne.events, t)).includes("choice.ended.done"));
 
@@ -1797,8 +1802,8 @@ function checkSaid(run, { events, state }) {
         "place.question{marble: <aging_flick>, slot: slot.apex}",
         "place.values{effect: effect.combined{parts: [effect.speed_up{amount: 8}]}}",
         "place.flick{marble: <aging_flick>, effect: effect.none}",
-        "place.knockout{marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.hit{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}}",
+        "place.knockout{marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.pot{reactions: effect.none}",
       ],
       menuLines(0, "apex")
@@ -1809,8 +1814,8 @@ function checkSaid(run, { events, state }) {
         "place.question{marble: <hit_polish>, slot: slot.leftBase}",
         "place.values{effect: effect.combined{parts: [effect.mass_up{amount: 1}]}}",
         "place.flick{marble: <hit_polish>, effect: effect.none}",
-        "place.knockout{marble: <tally_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.hit{marble: <hit_polish>, effect: forecast_choice.after{effect: effect.combined{parts: [effect.given_choice{effect: effect.polish{amount: 1}, target: choice.noun.triangle_marble{count: 1}, upTo: no}]}}}",
+        "place.knockout{marble: <tally_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}}",
         "place.pot{reactions: effect.none}",
       ],
       menuLines(2, "leftBase")
@@ -1829,12 +1834,12 @@ function checkSaid(run, { events, state }) {
       ],
       placementLines(lensToPlace, 0, "leftBase", rules, t).map(({ key, params }) => t(key, params))
     );
-    // Le menu entier : question, valeurs, Chiquenaude, Éjection, Tic, le pot, puis
+    // Le menu entier : question, valeurs, Chiquenaude, Tic, Éjection, le pot, puis
     // Annuler avant Confirmer ; seules ces deux-là agissent.
     const entries = confirmationEntries(() => {}, placementLines(lensed, 0, "apex", rules, t));
     run.same(
       "confirmation : ordre complet du menu sur occupé",
-      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.knockout", "marbles.place.hit", "marbles.place.pot", "menu.confirm.cancel", "menu.confirm.confirm"],
+      ["marbles.place.question", "marbles.place.values", "marbles.place.flick", "marbles.place.hit", "marbles.place.knockout", "marbles.place.pot", "menu.confirm.cancel", "menu.confirm.confirm"],
       entries.map((entry) => entry.label)
     );
     run.same(
@@ -1852,7 +1857,7 @@ function checkSaid(run, { events, state }) {
     const placing = rules.reduce(lensed, { type: "place", handIndex: 0, slot: "apex" });
     run(
       "texte : pose sur occupé",
-      "event.effect_flick{marble: <aging_flick>, effect: effect.none, speed: 0, mass: 1} event.effect_knockout{marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 3, mass: 1} event.discarded.replacement{marble: <hit_pocket>} event.placed{marble: <aging_flick>, slot: slot.apex} event.effect_hit{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, speed: 5, mass: 1}",
+      "event.effect_flick{marble: <aging_flick>, effect: effect.none, speed: 0, mass: 1} event.placed{marble: <aging_flick>, slot: slot.apex} event.effect_hit{marble: <aging_flick>, effect: effect.combined{parts: [effect.speed_up{amount: 2}]}, speed: 2, mass: 1} event.effect_knockout{marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 3}]}, speed: 5, mass: 1} event.discarded.replacement{marble: <hit_pocket>}",
       stepsText(buildSteps(placing.events, t))
     );
     const lensedSteps = buildSteps(rules.reduce(lensed, { type: "resolve" }).events, t).map((step) => step.text);
@@ -1936,11 +1941,11 @@ const WITNESSES = {
       "Poser argile en pointe ?",
       "Vitesse +4",
       "Chiquenaude d'argile : aucun effet",
-      "Éjection de dragon : Vitesse +3",
       "Tic d'argile : Vitesse +2",
+      "Éjection de dragon : Vitesse +3",
       "Pot : aucun effet",
     ],
-    placing: "Éjection de dragon : Vitesse +3. Vitesse 3, Masse 1. Défausse : dragon. Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 5, Masse 1.",
+    placing: "Pose : argile en pointe. Tic d'argile : Vitesse +2. Vitesse 2, Masse 1. Éjection de dragon : Vitesse +3. Vitesse 5, Masse 1. Défausse : dragon.",
     wornOut: [
       "argile est usée et quitte le triangle.",
       "dragon est usé et quitte le triangle.",
@@ -1978,11 +1983,11 @@ const WITNESSES = {
       "Place clay on the apex?",
       "Speed +4",
       "Flick of clay: no effect",
-      "Knockout of dragon: Speed +3",
       "Hit from clay: Speed +2",
+      "Knockout of dragon: Speed +3",
       "Pot: no effect",
     ],
-    placing: "Knockout of dragon: Speed +3. Speed 3, Mass 1. Discard: dragon. Placement: clay on the apex. Hit from clay: Speed +2. Speed 5, Mass 1.",
+    placing: "Placement: clay on the apex. Hit from clay: Speed +2. Speed 2, Mass 1. Knockout of dragon: Speed +3. Speed 5, Mass 1. Discard: dragon.",
     wornOut: [
       "clay is worn out and leaves the triangle.",
       "dragon is worn out and leaves the triangle.",
