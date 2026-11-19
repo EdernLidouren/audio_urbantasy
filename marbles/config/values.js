@@ -24,9 +24,10 @@ export const DEFAULT_GAME = {
   // Le nombre de tours (definition.turns).
   turns: 10,
   // Les PALIERS de la partie libre (definition.goal.tiers) : des repères techniques
-  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de départ, 1000 parties) :
-  // les 25e, 50e et 90e centiles du score final.
-  tiers: { bronze: 87, silver: 96, gold: 113 },
+  // PROVISOIRES, tirés du simulateur (joueur glouton, sac de départ, 1000 parties,
+  // graine 1, set révisé de novembre 2026) : les 25e, 50e et 90e centiles du score
+  // final.
+  tiers: { bronze: 177, silver: 199, gold: 251 },
 };
 
 export const MARBLES_SETTINGS = {

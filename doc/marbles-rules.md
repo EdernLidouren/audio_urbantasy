@@ -582,8 +582,8 @@ Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut
 
 ### Les consulter
 
-- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 78 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
-- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 78 points en 8 tours. 60 sur 78, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 50, aucun palier atteint. Prochain palier : bronze à 87. » ; en endurance : « Objectif : Impact de 6 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
+- **À l'ouverture**, une seule annonce, avant celle du premier tour : l'objectif, puis chaque règle. « Objectif : 165 points en 8 tours. Règle : gravier. Les calots rapportent moitié moins de Vitesse et de Masse… »
+- **O** : l'objectif, la progression, puis le nombre de règles. « Objectif : 165 points en 8 tours. 110 sur 165, tour 5 sur 8. 1 règle. » ; en partie libre : « Objectif : libre, 10 tours. Tour 5 sur 10. Score 90, aucun palier atteint. Prochain palier : bronze à 177. » ; en endurance : « Objectif : Impact de 10 minimum chaque tour, 20 tours au plus. 4 tours tenus sur 20. »
 - **Maj+O** : un menu, de gauche à droite : l'objectif, puis chaque règle, puis « Retour » ; Échap ferme. Ctrl+bas parcourt la fiche de l'objectif (sa progression, ce qui le juge, la pioche impossible) ou d'une règle (son effet) ; E dit la description de la partie ou de la règle.
 - **À la fin** : le résultat selon l'objectif, puis le score final. « Partie terminée. Palier argent atteint. Score final : 100. », « Partie terminée. Victoire : objectif atteint. Score final : 80. », « Partie terminée. Fin de l'endurance : 4 tours tenus. Score final : 80. » ; sur une pioche impossible, la raison d'abord : « Plus aucune bille à jouer. ».
 
@@ -593,9 +593,9 @@ Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont d
 
 | Définition | Objectif | Sac | Règles |
 |---|---|---|---|
-| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 87, argent 96, or 113 | du joueur | aucune |
-| défi cible | 78 points en 8 tours | imposé : le sac de départ | aucune |
-| défi endurance | Impact de 6 minimum chaque tour, 20 tours au plus | du joueur, exactement 15 billes | aucune |
+| partie libre (la partie habituelle) | libre, 10 tours ; paliers bronze 177, argent 199, or 251 | du joueur | aucune |
+| défi cible | 165 points en 8 tours | imposé : le sac de départ | aucune |
+| défi endurance | Impact de 10 minimum chaque tour, 20 tours au plus | du joueur, exactement 15 billes | aucune |
 | gravier | libre, 10 tours | du joueur | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
 | terrain étroit | libre, 10 tours | du joueur | un lancer de moins ; échange interdit |
 | sans pot | libre, 10 tours | du joueur | pot inerte : les billes du pot n'agissent pas |
