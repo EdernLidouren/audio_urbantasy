@@ -219,6 +219,10 @@ Les mots-clés se consultent en jeu, sur la bille sous le curseur, avec la touch
   - Moment : à son retrait par usure, à l'étape des retraits ou aussitôt après une Fêlure. Jamais à un remplacement, à un échange, à une éjection ni à une mise en poche.
 - Chute : se déclenche quand la bille arrive à la défausse, d'où qu'elle vienne.
   - Moment : à son arrivée à la défausse, au bout de son chemin : après son Final ou son Éjection s'il y en a un, depuis le triangle, la main ou le sac. Jamais si un effet l'a envoyée ailleurs (au pot). Ses valeurs vont aux compteurs du tour. À la défausse, Empocher sur elle-même l'envoie au pot.
+- Polissage : se déclenche quand cette bille, sur le triangle, est polie d'au moins 1 point d'usure.
+  - Moment : juste après le Polissage qui l'a polie, à tout moment du tour, comme la Trouvaille. Un Polissage qui ne rend rien (la bille à usure 0) ne le déclenche pas. Il porte le nom de l'action Polissage : la touche E les décrit chacun, l'un après l'autre.
+- Fêlure : se déclenche quand une bille active, celle-ci comprise, est fêlée d'au moins 1 point d'usure.
+  - Moment : juste après la Fêlure, à tout moment du tour. Chaque bille active qui a cet effet réagit, dans l'ordre horaire ; une bille que la Fêlure a amenée à son maximum est déjà partie, et ne réagit plus. Il porte le nom de l'action Fêlure, comme le Polissage reçu.
 - En poche : effets actifs uniquement lorsque la bille est dans le pot : à son entrée, à chaque résolution, ou en réaction à ce qui se passe pendant la partie.
   - Trois moments : à l'entrée au pot, juste après l'arrivée de la bille (jamais si elle est perdue) ; à chaque résolution, à l'étape du pot ; à chaque occurrence d'un évènement de la partie, une réaction (section 9).
 
@@ -379,7 +383,7 @@ Une action dont la cible est vide ne fait rien, et le journal le dit : un emplac
 Une bille du pot peut réagir à ce qui se passe pendant la partie : « En poche, à chaque chiquenaude : Vitesse +2 ».
 
 - Elle peut écouter un évènement de la partie, le déclenchement d'un mot-clé chez une bille qui en a l'effet, ou le déclenchement d'une action : les valeurs de partie de ces trois catégories (section 10, « Les catégories »).
-- Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes.
+- Elle n'écoute jamais une quantité (comme les points d'usure rendus), ni les gains et pertes de Vitesse et de Masse, ni les réactions elles-mêmes. Pour réagir à chaque bille plutôt qu'à chaque action, elle écoute un évènement : « à chaque bille renvoyée par un rebond », « à chaque bille éjectée par un effet », « à chaque éjection d'une bille normale ou d'un calot ».
 - Elle réagit une fois par occurrence : trois billes piochées, trois réactions. Un évènement qui compte pour deux occurrences écoutées donne deux réactions.
 - **L'ordre, une seule règle** : l'évènement se produit et les valeurs de partie sont comptées ; la bille concernée joue d'abord son propre effet (l'Éveil après sa pioche, le Final ou l'Éjection après son départ du triangle, les Trouvailles des billes actives après un mélange) ; puis les billes du pot réagissent, dans l'ordre d'arrivée ; puis les statuts, dans l'ordre où ils ont été reçus (section 12). Le même ordre partout : pour la pioche du début de tour comme pour une Pioche d'effet, pour un retrait à l'étape des retraits comme pour un retrait par une Fêlure. Une bille perdue au pot plein suit cet ordre comme toute arrivée. Après un mélange, les réactions jouent avant que la pioche ne reprenne.
 - **Une seule exception, les phases de la résolution** : ce qu'elles font réagir (une phase de base, un Polissage, une pioche…) attend la fin de la phase de pointe. À l'étape du pot, chaque bille joue ses réactions retenues, puis son effet à chaque résolution, avant la bille suivante ; puis les statuts jouent les leurs. Une abeille au pot ne se fait donc entendre qu'après la pointe, deux fois si les deux bases ont joué.
@@ -406,7 +410,7 @@ Les valeurs de partie sont des compteurs tenus pendant la partie. Les montants c
 - **Les déclenchements de mots-clés** : Éveil, Chiquenaude, Tic, Trouvaille, Éjection, Final, Chute, pointe, base, base droite, base gauche, et les effets En poche (entrée, résolution, réactions).
 - **Les actions** : pour chaque mot-clé d'action, ses déclenchements, et sa quantité réelle (billes piochées, usure rendue ou ajoutée, billes déplacées au pot, billes chassées, billes défaussées, renvoyées en main, ramassées).
 - **Vitesse et Masse** : les gains et les pertes, en nombre et en total.
-- **Les évènements** : billes lancées, tiquées, éjectées, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
+- **Les évènements** : billes lancées, tiquées, éjectées, éjectées par un effet, billes normales et calots éjectés, mélanges, billes piochées, usées, sorties du triangle, mises en poche, perdues, défaussées (toute arrivée à la défausse, d'où qu'elle vienne), renvoyées par un rebond (en main, ou à la défausse, main pleine) ; statuts reçus, renforcés, charges de statut utilisées, statuts terminés.
 
 ### Les règles de comptage
 
@@ -523,6 +527,7 @@ Cette liste est générée à partir de la table des statuts ; elle ne se modifi
 <!-- statuts de test : début -->
 
 - **Lancer supplémentaire** : lancers +1 par intensité, le prochain tour. Se cumule en intensité.
+- **Élan** : lancers +1 par intensité, ce tour. Se cumule en intensité.
 - **Poche profonde** : capacité du pot +1 par intensité, toute la partie. Se cumule en intensité.
 - **Coup de fouet** : le prochain gain de Vitesse est doublé. Une charge ; chaque nouvelle application en ajoute une.
 - **Amorti** : les pertes de Vitesse sont réduites de 1 par intensité, sans jamais devenir un gain. 3 tours ; se cumule en intensité.

@@ -40,6 +40,8 @@ export const TRIGGER_WORDS = {
   knockout: { name: "Éjection", effect: "Effet d'éjection", produced: "en éjection", brought: "les éjections" },
   final: { name: "Final", effect: "Effet final", produced: "en final" },
   drop: { name: "Chute", effect: "Effet de chute", produced: "en chute" },
+  polished: { name: "Polissage reçu", effect: "Effet de polissage reçu", produced: "en polissage reçu" },
+  cracked: { name: "Fêlure reçue", effect: "Effet de fêlure reçue", produced: "en fêlure reçue" },
   // Les moments En poche (marbles/config/values.js/MARBLE_POCKET).
   pocketEntry: { name: "En poche, à l'entrée", effect: "Effet d'entrée au pot", produced: "à l'entrée au pot" },
   pocketResolution: { name: "En poche, à chaque résolution", effect: "Effet du pot", produced: "au pot" },

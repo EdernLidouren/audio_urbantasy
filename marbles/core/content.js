@@ -238,8 +238,13 @@ export function validateMarbleTriggers(triggers) {
   const seen = { id: new Set(), field: new Set(), event: new Set() };
   for (const trigger of triggers) {
     const describe = `déclencheur "${trigger.id}"`;
-    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "replacement", "forecast", "texts", "card"], describe, fail);
+    rejectUnknownFields(trigger, ["id", "field", "event", "marble", "moment", "replacement", "scope", "atLeast", "forecast", "texts", "card"], describe, fail);
     if (trigger.replacement !== undefined && typeof trigger.replacement !== "boolean") fail(`${describe} : replacement doit valoir true ou false.`);
+    if (trigger.scope !== undefined && !["self", "any"].includes(trigger.scope)) fail(`${describe} : scope inconnu "${trigger.scope}" (self, any).`);
+    if (trigger.scope !== undefined && trigger.marble !== "onSlot") fail(`${describe} : scope ne vaut que pour une bille sur le triangle (onSlot).`);
+    if (trigger.atLeast !== undefined && (trigger.atLeast === null || typeof trigger.atLeast !== "object" || !Object.values(trigger.atLeast).every(Number.isInteger))) {
+      fail(`${describe} : atLeast est un objet de minimums entiers.`);
+    }
     for (const key of ["id", "field", "event"]) {
       if (typeof trigger[key] !== "string" || trigger[key] === "") fail(`${describe} : ${key} doit être un texte.`);
       if (seen[key].has(trigger[key])) fail(`${describe} : ${key} "${trigger[key]}" en double.`);

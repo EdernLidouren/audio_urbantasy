@@ -563,7 +563,7 @@ function checkKeywords(run) {
   run.same("mots-clés : une bille sans effet n'en a aucun", [], ids("bare", made));
   run.same(
     "mots-clés : l'ordre de la liste, déclencheurs, En poche, actions, puis phases",
-    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "applyStatus", "apex", "base"],
+    ["awaken", "flick", "hit", "windfall", "knockout", "final", "drop", "polished", "cracked", "pocketed", "draw", "polish", "crack", "pocket", "eject", "discard", "bounce", "retrieve", "applyStatus", "apex", "base"],
     MARBLE_KEYWORDS.map((keyword) => keyword.id)
   );
 

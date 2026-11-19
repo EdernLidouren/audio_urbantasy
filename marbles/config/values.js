@@ -354,6 +354,12 @@ export const MARBLE_PHASES = [
 //   replacement  (facultatif) vrai s'il joue pendant un REMPLACEMENT : son
 //             évènement porte la posée et l'éjectée, que la condition de calibre
 //             relatif compare (relativeSize, refusée ailleurs) ;
+//   scope     (facultatif, "onSlot" seulement) qui réagit : "self" (par défaut), la
+//             bille de l'emplacement de l'évènement ; "any", toute bille active qui
+//             a le champ, elle comprise ;
+//   atLeast   (facultatif) ce que l'évènement doit porter pour le déclencher, des
+//             champs numériques et leur minimum : { applied: 1 }, une usure
+//             vraiment changée ;
 //   forecast  où sa prévision se dit :
 //               { line: "placement", marble, order } : pendant une pose, sa propre
 //               ligne de la confirmation, pour la bille "occupant" (la remplacée)
@@ -514,6 +520,48 @@ export const MARBLE_TRIGGERS = [
     },
     card: "below",
   },
+  // Le Polissage reçu : la bille ACTIVE elle-même vient d'être polie d'au moins 1
+  // (l'usure vraiment rendue : polir une bille à 0 ne déclenche rien), par un effet,
+  // à tout moment. Il porte le nom de l'action Polissage, qu'il ne faut pas confondre :
+  // ses textes disent le déclencheur.
+  {
+    id: "polished",
+    field: "polished",
+    event: "polished",
+    marble: "onSlot",
+    moment: "anytime",
+    atLeast: { applied: 1 },
+    forecast: { line: "slot" },
+    texts: {
+      name: "marbles.keyword.polished.name",
+      description: "marbles.keyword.polished.description",
+      card: "marbles.card.polished",
+      effect: "marbles.event.effect_polished",
+      slot: "marbles.outcome.polished",
+    },
+    card: "below",
+  },
+  // La Fêlure reçue : une bille ACTIVE, n'importe laquelle, elle comprise, vient
+  // d'être fêlée d'au moins 1 ; chaque bille active qui a ce champ réagit, encore sur
+  // le triangle (fêlée jusqu'à son maximum, elle est déjà partie et ne réagit plus).
+  {
+    id: "cracked",
+    field: "cracked",
+    event: "cracked",
+    marble: "onSlot",
+    moment: "anytime",
+    scope: "any",
+    atLeast: { applied: 1 },
+    forecast: { line: "slot" },
+    texts: {
+      name: "marbles.keyword.cracked.name",
+      description: "marbles.keyword.cracked.description",
+      card: "marbles.card.cracked",
+      effect: "marbles.event.effect_cracked",
+      slot: "marbles.outcome.cracked",
+    },
+    card: "below",
+  },
 ];
 
 // Les VALEURS DE PARTIE (Tally) : des compteurs tenus par la simulation, dans l'état
@@ -532,8 +580,9 @@ export const MARBLE_TRIGGERS = [
 //   match   (facultatif) des champs de l'évènement et leur valeur exigée, ou la
 //           liste des valeurs admises : { cause: "wear" }, { cause: ["a", "b"] } ;
 //   filter  (facultatif) { type: "size", size } : la bille que nomme l'évènement
-//           est de ce calibre (un évènement qui nomme toujours une bille connue,
-//           jamais la pioche, dont la bille est cachée dans la prévision).
+//           est de ce calibre, ou d'un de ces calibres (`size`, une liste) (un
+//           évènement qui nomme toujours une bille connue, jamais la pioche, dont la
+//           bille est cachée dans la prévision).
 // Tous comptent À L'ÉMISSION de leur évènement, avant que les billes n'y réagissent.
 // AJOUTER un compteur d'évènement : une entrée ici et ses deux textes dans chaque
 // langue, rien d'autre ; ses deux portées, sa source et sa ligne du menu suivent.
@@ -546,6 +595,13 @@ export const MARBLE_TALLIES = [
   // Chaque bille chassée du triangle : par un remplacement (une pose), ou par
   // l'action Éjecter.
   { id: "ejectedMarbles", events: ["removed"], match: { cause: ["replacement", "eject"] } },
+  // Chaque bille chassée du triangle par l'action Éjecter (jamais par une pose).
+  { id: "effectEjectedMarbles", events: ["removed"], match: { cause: "eject" } },
+  // Chaque bille normale ou calot chassé du triangle, par une pose ou par Éjecter.
+  { id: "ejectedBigMarbles", events: ["removed"], match: { cause: ["replacement", "eject"] }, filter: { type: "size", size: [MEDIUM, LARGE] } },
+  // Chaque bille déplacée par un Rebond : arrivée en main, ou à la défausse, main
+  // pleine.
+  { id: "bouncedMarbles", events: ["returned", "discarded"], match: { movedBy: "bounce" } },
   // Chaque régénération du sac depuis la défausse.
   { id: "shuffles", events: ["bagRegenerated"] },
   // Chaque bille piochée, pioche du tour comme effets.

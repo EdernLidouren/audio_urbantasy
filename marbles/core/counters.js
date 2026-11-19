@@ -65,14 +65,26 @@ function locked(context, lock, trigger = null) {
 }
 
 // Un déclencheur (MARBLE_TRIGGERS) : la bille concernée est celle que nomme son
-// évènement, sur l'emplacement, retirée ou en cours de lancer.
+// évènement, sur l'emplacement, retirée ou en cours de lancer ; pour un déclencheur
+// de portée "any", chaque bille active qui a son champ (une par bille). Seulement si
+// l'évènement porte ce qu'il exige (`atLeast`, triggerOccurs).
 function triggerCounter(trigger) {
   return {
     id: trigger.id,
     category: "trigger",
     listenable: true,
-    count: (event, context) => (event.type === trigger.event && hasField(context.types, event.marble, trigger.field) && !locked(context, "trigger", trigger.id) ? 1 : 0),
+    count(event, context) {
+      if (event.type !== trigger.event || !triggerOccurs(trigger, event) || locked(context, "trigger", trigger.id)) return 0;
+      if (trigger.scope === "any") return Object.values(context.state?.triangle ?? {}).filter((placed) => placed !== null && hasField(context.types, placed.marble, trigger.field)).length;
+      return hasField(context.types, event.marble, trigger.field) ? 1 : 0;
+    },
   };
+}
+
+// L'évènement porte-t-il ce que le déclencheur exige (`atLeast`, des minimums de champs
+// numériques : { applied: 1 }) ?
+export function triggerOccurs(trigger, event) {
+  return Object.entries(trigger.atLeast ?? {}).every(([field, minimum]) => (event[field] ?? 0) >= minimum);
 }
 
 // Une phase : `slots`, les emplacements où ce mot-clé joue. Effet de phase de la
@@ -128,13 +140,15 @@ function statCounters(id) {
 // leurs champs, leur validation, et le test d'un évènement (qui nomme une bille
 // connue).
 const EVENT_FILTERS = {
-  // La bille que nomme l'évènement est de calibre `size`.
+  // La bille que nomme l'évènement est de calibre `size`, ou d'un des calibres de la
+  // liste `size`.
   size: {
     fields: ["type", "size"],
     validate(filter, describe, fail) {
-      if (!isMarbleSize(filter.size)) fail(`${describe} : calibre inconnu "${filter.size}".`);
+      const sizes = Array.isArray(filter.size) ? filter.size : [filter.size];
+      if (sizes.length === 0 || !sizes.every(isMarbleSize)) fail(`${describe} : calibre inconnu "${filter.size}".`);
     },
-    test: (filter, event, types) => types[event.marble].size === filter.size,
+    test: (filter, event, types) => (Array.isArray(filter.size) ? filter.size.includes(types[event.marble].size) : types[event.marble].size === filter.size),
   },
 };
 

@@ -754,6 +754,26 @@ dans un texte passe par `nameRef`, avec ses formes françaises et anglaises `ind
 calot »), `noun` (« bille normale ») et `plural` (« minibilles », pour « toutes les
 minibilles actives » ; une forme déclarée dans `data/i18n/grammar.json`).
 
+### Polissage et Fêlure reçus
+
+Deux déclencheurs sur le triangle (`MARBLE_TRIGGERS`, champs `polished` et `cracked`),
+qui portent les noms des actions Polissage et Fêlure (leurs textes disent le
+déclencheur ; la touche E décrit l'un et l'autre, deux entrées) :
+
+- **Polissage reçu** (`polished`, portée `self`) : la bille de l'emplacement de
+  l'évènement `polished`, si elle a ce champ ;
+- **Fêlure reçue** (`cracked`, portée `scope: "any"`) : à chaque évènement `cracked`,
+  chaque bille active qui a ce champ, elle comprise, dans l'ordre horaire
+  (`marbleListeners`).
+
+Tous deux exigent une usure vraiment changée (`atLeast: { applied: 1 }`, lu par
+`counters.js`/`triggerOccurs`, côté écouteurs comme côté compteurs) : polir une bille à
+0 ne déclenche rien. Ils jouent quand leur évènement est traité, à tout moment du tour,
+comme la Trouvaille, jamais retenus pendant les phases. Une bille fêlée jusqu'à son
+maximum part aussitôt (`retireMarble`), avant que l'évènement ne soit traité : elle ne
+réagit plus, mais son compteur a compté à l'émission (règle des valeurs de partie).
+Leur compteur (`polished`, `cracked`) compte une fois par bille qui a le champ.
+
 ### Éjecter
 
 **Éjecter** (`eject`, mot-clé d'action, `marbles/core/effects.js`/`CLAUSE_ACTIONS`) chasse

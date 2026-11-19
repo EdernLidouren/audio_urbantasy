@@ -40,6 +40,7 @@ import {
 } from "./effects.js";
 import { HOLDER_ZONES, SLOTS } from "./zones.js";
 import { recordTally } from "./tally.js";
+import { triggerOccurs } from "./counters.js";
 import { ChoiceSuspension, chooseTargets } from "./choices.js";
 import { ejectFromSlot, handRoom, moveBy, moveFromBag, moveFromDiscard, moveFromHand, moveFromSlot, redirect, retireMarble, travel } from "./path.js";
 import { LISTENABLE_KEYS, REACTION_KEYS, REACTIVE_MOMENT, TALLY_COUNTERS, maxWearOf, pocketClauses, reactionClauses } from "./content.js";
@@ -119,7 +120,9 @@ for (const trigger of MARBLE_TRIGGERS) {
 }
 
 function eventTrigger(trigger) {
-  const clausesOf = (listener, types) => types[listener.marble][trigger.field] ?? null;
+  // Seulement si l'évènement porte ce qu'il exige (triggerOccurs : une usure vraiment
+  // changée, pour le Polissage et la Fêlure reçus).
+  const clausesOf = (event, listener, types) => (triggerOccurs(trigger, event) ? (types[listener.marble][trigger.field] ?? null) : null);
   // Un déclencheur verrouillé ne joue plus (marbles/core/statuses.js/LOCKS).
   const lock = { lock: "trigger", trigger: trigger.id };
   if (Object.hasOwn(NAMED_MARBLE, trigger.marble)) {
@@ -132,14 +135,17 @@ function eventTrigger(trigger) {
       lock,
       zones: trigger.forecast.line === "none" ? [] : [zone],
       listeners: (event) => [{ zone: HOLDER_ZONES[trigger.marble].zone, ...NAMED_MARBLE[trigger.marble](event) }],
-      clauses: (event, listener, types) => clausesOf(listener, types),
+      clauses: (event, listener, types) => clausesOf(event, listener, types),
     };
   }
+  // Sur le triangle : la bille de l'emplacement de l'évènement ("self"), ou toute bille
+  // active ("any"), dans l'ordre horaire (marbleListeners).
+  const concerned = trigger.scope === "any" ? (event, listener) => listener.zone === "triangle" : isOnEventSlot;
   return {
     id: trigger.id,
     lock,
     zones: ON_SLOT,
-    clauses: (event, listener, types) => (isOnEventSlot(event, listener) ? clausesOf(listener, types) : null),
+    clauses: (event, listener, types) => (concerned(event, listener) ? clausesOf(event, listener, types) : null),
   };
 }
 

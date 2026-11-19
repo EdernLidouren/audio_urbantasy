@@ -40,6 +40,7 @@
 // AJOUTER UN STATUT : son fichier ici, sa ligne ci-dessous, ses deux textes dans
 // chaque langue ; une bille le donne par applyStatus(id) (marbles/content/effects.js).
 import extraThrow from "./extraThrow.js";
+import momentum from "./momentum.js";
 import deepPocket from "./deepPocket.js";
 import whiplash from "./whiplash.js";
 import cushion from "./cushion.js";
@@ -62,6 +63,7 @@ import silence from "./silence.js";
 
 export default {
   extraThrow,
+  momentum,
   deepPocket,
   whiplash,
   cushion,

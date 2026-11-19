@@ -189,8 +189,8 @@ function checkKeywords(run) {
   const hit = rules.reduce(hitPocket, { type: "place", handIndex: 0, slot: "apex" });
   run.same("mots-clés : le Tic à condition fausse ne produit rien", [{ marble: "hit_pocket", speedDelta: 0 }], effectsOf(hit.events, "hit"));
   run.same(
-    "mots-clés : mais compte, comme ses évènements ; one_shot sans Éjection : +1 bille éjectée, +0 éjection",
-    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, triangleExits: 1, discardedMarbles: 1, pocket: 1 },
+    "mots-clés : mais compte, comme ses évènements ; one_shot sans Éjection : +1 bille éjectée (un calot : +1 normale ou calot), +0 éjection",
+    { hit: 1, thrownMarbles: 1, hitMarbles: 1, ejectedMarbles: 1, ejectedBigMarbles: 1, triangleExits: 1, discardedMarbles: 1, pocket: 1 },
     added(hitPocket, hit.state)
   );
   // Une occupante qui a une Éjection : +1 éjection, aussi.

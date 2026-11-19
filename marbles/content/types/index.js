@@ -79,6 +79,8 @@
 //           la défausse, les prochaines du sac). Pour une Vitesse ou une Masse, un
 //           emplacement donne un bonus à sa phase (jamais une phase toujours passée,
 //           ni dans un Final) ;
+//   (les champs de déclencheur : marbles/config/values.js/MARBLE_TRIGGERS, dont
+//   `polished`, Polissage reçu, et `cracked`, Fêlure reçue)
 //   when    (facultatif) sa condition, évaluée au déclenchement (calibre, famille,
 //           rareté ou bille précise d'un emplacement, emplacement vide ou occupé,
 //           calibre d'une bille d'un remplacement, état d'une zone, un nombre comparé
