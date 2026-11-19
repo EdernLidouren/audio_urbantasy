@@ -17,6 +17,7 @@ leur mécanisme : `doc/marbles.md`.
 | `marbles/tools/compare.js` | Le comparateur : les six simulations de référence sur un commit et sur le code en cours, et ce qui change entre leurs rapports |
 | `marbles/tools/rules-doc.js` | Le document de règles (`doc/marbles-rules.md`) : génère son annexe des billes depuis la table (`--write`), et vérifie qu'elle est à jour et que chaque mot-clé y figure avec sa description exacte (lancé par `tools/verify.js`) |
 | `marbles/tools/set-sheet.js` | La fiche du set : un fichier texte de toutes les billes telles que le jeu les a (noms français et anglais, famille, rareté, calibre, usure, descriptions dans les deux langues, effets tels que la fiche les dit, sacs préfaits), pour travailler le contenu hors du code ; au terminal, ou dans un fichier (`--out <fichier>`, qu'elle n'écrase qu'avec `--force`) : `node marbles/tools/set-sheet.js --out "dev/gameplay/marbles/set de billes 4.txt"` |
+| `marbles/tools/mechanics-sheet.js` | La fiche des mécaniques : un fichier texte de ce avec quoi une bille peut s'écrire (zones, calibres, familles, raretés ; mots-clés et leurs descriptions dans les deux langues ; conditions, montants calculés, filtres et cibles, chacun par un exemple que le jeu dit lui-même dans les deux langues ; valeurs de partie, écoutables ou non ; statuts, leur effet, leur durée et leur cumul ; ce qu'un statut peut toucher ; définitions de partie), chaque entrée avec les billes du set qui s'en servent (« aucune bille » : prête, inutilisée) ; mêmes options que la fiche du set : `node marbles/tools/mechanics-sheet.js --out "dev/gameplay/marbles/mécaniques.txt"` |
 
 Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 
@@ -37,6 +38,8 @@ Les modules qu'ils partagent, purs (sans Node, donc vérifiables) :
 | `marbles/tools/report-diff.js` | La différence de deux rapports, ligne à ligne, rangée sous sa section et sa bille |
 | `marbles/tools/export.js` | L'export JSON ou CSV |
 | `marbles/tools/set-sheet-builder.js` | La construction de la fiche du set (`buildSetSheet`), dans la langue de chaque partie, la langue en vigueur rendue ensuite |
+| `marbles/tools/mechanics-sheet-builder.js` | La construction de la fiche des mécaniques (`buildMechanicsSheet`) : un exemple écrit à la main par condition, source de montant, filtre et sorte de cible, dit par le jeu ; une condition, une source ou un filtre ajoutés au jeu sans exemple font échouer la fiche |
+| `marbles/tools/sheet-output.js` | La sortie commune des deux fiches : au terminal, ou dans un fichier (`--out`, `--force`) |
 
 ## Jouer une partie
 
@@ -225,7 +228,10 @@ chaque définition du jeu jouée avec son résultat au rapport,
 les demande, différence de deux rapports (titres connus du comparateur, contexte,
 résultats, durée ignorée), et fiche du set (une entrée par bille dans l'ordre de la
 table, deux descriptions, chaque sac préfait, la langue rendue, le même texte d'une
-fois sur l'autre). Les outils étant liés à la vraie table
+fois sur l'autre), et fiche des mécaniques (un exemple par condition, source et
+filtre du jeu, chaque mot-clé, valeur de partie et statut, aucune clé de texte
+brute, les billes relevées dans leurs clauses sur une table réduite, la langue
+rendue, le même texte d'une fois sur l'autre). Les outils étant liés à la vraie table
 (`marbles/tools/game-rules.js`), ces vérifications la jouent aussi, mais n'en attendent
 aucun chiffre : ce qu'elles comparent se déduit de la table et des réglages.
 

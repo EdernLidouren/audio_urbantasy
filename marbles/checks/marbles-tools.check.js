@@ -27,7 +27,10 @@ import { contextLabel, diffReports, reportAnomalies } from "../tools/report-diff
 import { parseArgs } from "../tools/args.js";
 import { MARBLE_COLUMNS, toCsv, toJson } from "../tools/export.js";
 import { buildSetSheet } from "../tools/set-sheet-builder.js";
-import { getLocale } from "../../data/i18n/index.js";
+import { MECHANICS_EXAMPLES, buildMechanicsSheet } from "../tools/mechanics-sheet-builder.js";
+import { AMOUNT_SOURCES, CONDITIONS, TARGET_FILTERS } from "../core/effects.js";
+import { MARBLE_KEYWORDS, TALLY_COUNTERS } from "../core/content.js";
+import { getLocale, setLocale, t } from "../../data/i18n/index.js";
 import MARBLE_TYPES from "../content/types/index.js";
 import { DEFAULT_GAME_DEFINITION, GAME_RULES, defaultToolsBag, definitionById, gameSetup, withSettings } from "../tools/game-rules.js";
 import { caughtMessage, handIds } from "./helpers.js";
@@ -53,6 +56,7 @@ export default function checkMarblesTools(run) {
   run.section("différence de rapports", checkReportDiff);
   run.section("ligne de commande", checkArgs);
   run.section("fiche du set", checkSetSheet);
+  run.section("fiche des mécaniques", checkMechanicsSheet);
 }
 
 // Une clause qui pioche, quelque part dans les effets d'une bille.
@@ -569,6 +573,44 @@ function checkSetSheet(run) {
   run("fiche du set : ni espace insécable ni « aucun effet »", false, /[\u00a0\u202f]/.test(sheet) || sheet.includes(": aucun effet."));
   run("fiche du set : la langue rendue", before, getLocale());
   run("fiche du set : même table, même fiche", sheet, buildSetSheet({ date: "2000-01-01" }));
+}
+
+// LA FICHE DES MÉCANIQUES (marbles/tools/mechanics-sheet-builder.js) : un exemple par
+// condition, source de montant et filtre du jeu ; chaque mot-clé, valeur de partie et
+// statut une fois ; aucune clé de texte restée brute ; et les billes qui se servent de
+// chaque mécanique, relevées dans leurs clauses (sur une table réduite à la galaxie :
+// une condition groupée sur un compte de billes, une source filtrée par famille).
+function checkMechanicsSheet(run) {
+  const before = getLocale();
+  // Un texte du jeu en français, tel que la fiche l'écrit (espaces ordinaires).
+  const french = (key) => {
+    const was = getLocale();
+    setLocale("fr");
+    const text = t(key).replace(/[\u00a0\u202f]/g, " ");
+    setLocale(was);
+    return text;
+  };
+  const sheet = buildMechanicsSheet({ date: "2000-01-01" });
+  const lines = sheet.split("\n");
+  run("fiche des mécaniques : la date demandée", true, lines[1] === "Généré à partir du jeu le 2000-01-01.");
+  run.same("fiche des mécaniques : un exemple par condition", Object.keys(CONDITIONS).sort(), Object.keys(MECHANICS_EXAMPLES.conditions).sort());
+  run.same("fiche des mécaniques : un exemple par source de montant", Object.keys(AMOUNT_SOURCES).sort(), Object.keys(MECHANICS_EXAMPLES.sources).sort());
+  run.same("fiche des mécaniques : un exemple par filtre", Object.keys(TARGET_FILTERS).sort(), Object.keys(MECHANICS_EXAMPLES.filters).sort());
+  run("fiche des mécaniques : chaque mot-clé", MARBLE_KEYWORDS.length, MARBLE_KEYWORDS.filter((keyword) => lines.some((line) => line.startsWith(`${french(keyword.texts.name)} / `))).length);
+  run("fiche des mécaniques : chaque valeur de partie", TALLY_COUNTERS.length, lines.filter((line) => line.includes(" — unité : ")).length);
+  run("fiche des mécaniques : chaque statut", Object.keys(GAME_RULES.statuses).length, lines.filter((line) => line.startsWith("Durée : ")).length);
+  run("fiche des mécaniques : aucune clé brute ni espace insécable", false, /\bmarbles?\.[a-z]|\[object |[\u00a0\u202f]/.test(sheet));
+  run("fiche des mécaniques : la langue rendue", before, getLocale());
+  run("fiche des mécaniques : mêmes tables, même fiche", sheet, buildMechanicsSheet({ date: "2000-01-01" }));
+
+  // Les billes de chaque entrée : la ligne « Billes » qui suit son intitulé.
+  const galaxy = buildMechanicsSheet({ date: "2000-01-01", rules: { ...GAME_RULES, types: { galaxy: GAME_RULES.types.galaxy } } }).split("\n");
+  const usersAfter = (label) => galaxy.slice(galaxy.indexOf(label)).find((line) => line.startsWith("Billes"));
+  const named = `Billes (1) : ${french("marble.galaxy.name")}.`;
+  run("fiche des mécaniques : une condition pour plusieurs clauses relevée", named, usersAfter(MECHANICS_EXAMPLES.forms.grouped.label));
+  run("fiche des mécaniques : le compte de billes relevé", named, usersAfter(MECHANICS_EXAMPLES.conditions.count.label));
+  run("fiche des mécaniques : le filtre de famille relevé", named, usersAfter(MECHANICS_EXAMPLES.filters.family.label));
+  run("fiche des mécaniques : une mécanique inutilisée", "Billes : aucune bille.", usersAfter(MECHANICS_EXAMPLES.forms.otherwise.label));
 }
 
 function checkArgs(run) {
