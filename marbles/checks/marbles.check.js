@@ -650,8 +650,8 @@ function checkPlace(run) {
   run("remplacement : ancienne bille à la défausse", "awaken_draw,one_shot", replacing.state.discard.join());
   run("remplacement : journal nomme l'ancienne", "one_shot", replacing.events.find((event) => event.type === "knockout").marble);
   run.same(
-    "remplacement : cause de la défausse",
-    { type: "discarded", marble: "one_shot", from: "triangle", slot: "apex", cause: "replacement" },
+    "remplacement : cause de la défausse, et la trace de la bille partie (usure, phases)",
+    { type: "discarded", marble: "one_shot", from: "triangle", slot: "apex", cause: "replacement", departed: { wear: 0, phases: 0 } },
     replacing.events.find((event) => event.type === "discarded")
   );
 
@@ -1111,15 +1111,17 @@ function checkResolution(run) {
   run("ordre horaire : un emplacement inconnu refusé", true, throws(() => nextSlot("middle")));
 
   // Rotation, inchangée dans les faits : chaque bille vers son suivant, base gauche
-  // -> pointe, pointe -> base droite, base droite -> base gauche.
+  // -> pointe, pointe -> base droite, base droite -> base gauche ; chacune a joué une
+  // phase (`phases`), qu'elle garde.
+  const played = (marble) => ({ ...placed(marble, 1), phases: 1 });
   run.same(
     "rotation : billes",
-    triangleOf(placed("hit_polish", 1), placed("final_pocket", 1), placed("aging_flick", 1)),
+    triangleOf(played("hit_polish"), played("final_pocket"), played("aging_flick")),
     result.state.triangle
   );
   run.same("rotation : journal porte le triangle d'après", result.state.triangle, result.events.find((event) => event.type === "rotation").triangle);
   const withHole = apply(playState({ triangle: triangleOf(placed("aging_flick"), null, null) }), { type: "resolve" });
-  run.same("rotation : les vides tournent aussi", triangleOf(null, null, placed("aging_flick", 1)), withHole.state.triangle);
+  run.same("rotation : les vides tournent aussi", triangleOf(null, null, played("aging_flick")), withHole.state.triangle);
 
   // Emplacement vide : phase sautée.
   const skipped = apply(playState({ triangle: triangleOf(null, placed("aging_flick"), null) }), { type: "resolve" });
@@ -1233,8 +1235,8 @@ function checkSizeConditions(run) {
   run("calibre, Tic : un calot éjecte une normale, plus petite : Vitesse +4", 4, hitSpeed("plain"));
   run("calibre, Tic : un calot éjecte un calot, ni plus petit ni plus gros : rien", 0, hitSpeed("twin"));
   run.same(
-    "calibre, Tic : le remplacement porté par l'évènement",
-    { placed: "bully", ejected: "pebble" },
+    "calibre, Tic : le remplacement porté par l'évènement, avec la trace de l'éjectée",
+    { placed: "bully", ejected: "pebble", departed: { wear: 0, phases: 0 } },
     hitOn("pebble").events.find((event) => event.type === "hit").replacement
   );
   const smallerHitter = apply(playState({ hand: inHand(["pebble"]), triangle: triangleOf(null, null, placed("plain")) }), { type: "place", handIndex: 0, slot: "apex" }, fabricatedRules({ ...table, pebble: { size: SMALL, hit: [{ action: "speed", amount: 4, when: smaller }] } }));

@@ -558,8 +558,13 @@ Un effet est une liste de clauses (`marbles/core/effects.js`) :
 
 Un `amount` peut être **calculé** au déclenchement : `{ base, step, source, max? }`, soit
 `base + step × la valeur de source`, plafonné à `max` s'il est donné
-(`marbles/core/effects.js`/`amountOf`). `step` vaut au moins 1, `max` dépasse `base` ; pour
-une action à montant positif (Pioche, Polissage, Fêlure), `base` vaut au moins 0. Évalué à
+(`marbles/core/effects.js`/`amountOf`). `step` est un entier non nul, `max` dépasse `base` ;
+pour une action à montant positif (Pioche, Polissage, Fêlure), `base` vaut au moins 0. Un
+`step` NÉGATIF (« Vitesse +5, −1 par point d'usure de cette bille ») ne vaut que pour la
+Vitesse et la Masse, sans `max`. Une source **signée** (`signed`, aujourd'hui `otherBase`)
+peut valoir moins de 0 : seulement pour la Vitesse et la Masse aussi. Une source
+**entière** (`whole`) se prend telle quelle, base 0 et pas 1 ; une source qui a un
+`wholeText` se dit alors à sa façon (« Vitesse égale à la Vitesse du tour »). Évalué à
 0, la clause ne produit rien. Il n'entre jamais dans l'imprimé (`printedStat`). C'est le
 SEUL mécanisme d'un montant qui dépend du moment : un « par » (« Vitesse +1 par minibille
 active ») en est un, base 0, pas 1. Le fantôme, la perle, l'étoile et l'agate :
@@ -575,8 +580,23 @@ apex: [speed({ base: 0, step: 2, source: familyCount(), max: 6 })],
 |---|---|---|
 | `{ type: "turnsInHand" }` | le compteur de tours en main de la bille elle-même : 0 hors de la main ; pendant sa Chiquenaude, celui qu'elle avait en quittant la main | « Chiquenaude : Vitesse +1 par tour en main, maximum +3, actuellement +2. » (fantôme) |
 | `{ type: "zoneCount", zone, filters? }` (`zoneCount(zone, filtre?)`) | le nombre de billes de la zone de la partie `zone` (`GAME_ZONES` : `triangle`, les actives ; `hand`, `bag`, `discard`, `pot`, `lost`), au déclenchement, celles qui passent le filtre s'il y en a un (`sizeIs`, `familyIs`, `rarityIs` : un seul), la bille elle-même comprise si elle en est ; une bille en transit ne compte nulle part (en partance, dans un Final ou une Éjection, ni en cours de lancer, dans une Chiquenaude) ; la fiche dit la valeur actuelle dans la partie en cours (`needsState`) | « Pointe : Masse +1, +1 par bille dans le pot, maximum +4. » (rubis), « Pointe : Vitesse +2 par Astres active, maximum +6, actuellement +4. » (galaxie), « Vitesse +1 par minibille active » |
-| `{ type: "familyCount" }` (`familyCount()`) | le nombre de familles DIFFÉRENTES parmi les billes actives (`distinctFamilies`) : chaque famille une fois, Classiques comprises, une bille à plusieurs familles comptant pour chacune ; une bille en transit ne compte pas | « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. » (agate) |
+| `{ type: "zoneCount", zones, filters? }` (`zoneCount([zone, zone], filtre?)`) | comme ci-dessus, les billes de PLUSIEURS zones additionnées (au moins deux, chacune une fois ; jamais `zone` et `zones` ensemble) ; les zones se disent en liste (`lists`, `marbles.zone_where.<zone>`), gabarit `marbles.effect.per_zones[_<filtre>]` | « Éveil : Vitesse +2 par bille normale en main et sur le triangle, maximum +8. » |
+| `{ type: "familyCount", zones? }` (`familyCount(zones?)`) | le nombre de familles DIFFÉRENTES parmi les billes actives (`distinctFamilies`), ou parmi celles de `zones` ensemble (au moins deux) : chaque famille une fois, Classiques comprises, une bille à plusieurs familles comptant pour chacune ; une bille en transit ne compte pas | « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. », « Pointe : Vitesse +3 par famille différente sur le triangle et en main, maximum +12. » |
+| `{ type: "stat", stat }` (`turnStat(compteur)`) | le compteur du tour `stat` (`speed`, `mass`) au déclenchement, avant l'effet qui le lit ; négatif, 0 ; telle quelle, `marbles.effect.equal_stat` | « Tic : Vitesse égale à la Vitesse du tour, maximum +8. » |
+| `{ type: "otherBase", stat }` (`otherBase(compteur)`) | ce que donne, pour `stat`, la bille de l'autre base : son effet de phase à son emplacement (variante comprise), évalué comme s'il jouait au déclenchement (conditions, sinon, montants calculés), sans bonus reçu ni statut, sans rien appliquer ; un malus aussi (signée) ; emplacement vide, ou pendant une autre copie (`copying` : deux billes qui se copieraient), 0. Dans un effet de base seulement, telle quelle (entière) | « Base : Vitesse égale à la Vitesse que donne la bille de l'autre base. » |
+| `{ type: "wear", marble?, remaining? }` (`wear({ marble, remaining })`) | l'usure de la bille elle-même, ou de l'éjectée (`marble: "ejected"`, pendant un remplacement) ; `remaining: true`, ce qui lui reste avant son maximum. Sur le triangle, son usure du moment ; partie (son Final, son Éjection, sa Chute ; l'éjectée pendant le Tic), celle de sa **trace de départ** ; jamais posée, 0. Refusée là où la bille n'a pas d'usure (en main, en lancer, au pot, un statut) | « Chute : Vitesse +5, −1 par point d'usure de cette bille. », « Tic : Vitesse +7 si la bille éjectée a au plus 1 point d'usure restant. » |
+| `{ type: "turnsOnTriangle" }` (`turnsOnTriangle()`) | les phases jouées par la bille elle-même sur le triangle (`phases` de son entrée), celle de ce tour comprise une fois jouée ; partie, celles de sa trace | « Final : Vitesse +2 par tour passé sur le triangle, maximum +10. » |
 | `{ type: "tally", tally, scope }` (`tally(id, portée)`) | la valeur de partie `tally` dans la portée `scope` (`"turn"`, ce tour ; `"game"`, cette partie), lue dans le registre au déclenchement (voir « Valeurs de partie ») | « Pointe : Vitesse +2 par éveil cette partie, maximum +20, actuellement +4. » (étoile) |
+
+**La trace de départ** (`marbles/core/path.js`/`departedRecord`) : une bille qui quitte le
+triangle perd son entrée (son usure, ses phases) ; son trajet en garde une trace,
+`{ wear, phases }`, que portent son déclencheur de sortie (`final`, `knockout` :
+`departed`), son arrivée à la défausse (`discarded`, `departed`) et le remplacement en
+cours (`replacement.departed`, l'éjectée, lue par le Tic). La situation d'un effet la
+donne à la bille elle-même seulement (`holder.departed`), jamais à une bille du pot qui
+réagit au même évènement. Les PHASES JOUÉES (`phases` de l'entrée du triangle, absent à
+l'arrivée) comptent une de plus à chaque phase jouée, usée ou non ; elles suivent la
+bille dans la rotation et l'échange.
 
 Le gabarit d'un nombre de billes dépend de son filtre (`text` en fonction de la source) :
 `marbles.effect.per_zone` sans filtre, `marbles.effect.per_zone_<filtre>` avec (le

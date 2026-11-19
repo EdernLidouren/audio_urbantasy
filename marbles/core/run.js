@@ -274,9 +274,13 @@ function applyToChosen(run, operation, targets, by) {
 // déclenche, d'où vient le remplacement en cours (Tic, Éjection).
 function fireEffect(run, trigger, listener, clauses, event) {
   const { slot, marble } = listener;
+  // La trace de la bille elle-même, si elle vient de quitter le triangle : portée par
+  // son déclencheur de sortie (Final, Éjection) et par son arrivée à la défausse
+  // (Chute) ; jamais celle d'une autre bille (une réaction du pot au même évènement).
+  const ownTrace = event.departed !== undefined && event.marble === marble && (listener.zone === "leaving" || listener.zone === "discard");
   const situation = {
     triangle: run.state.triangle,
-    holder: { marble, zone: listener.zone, turnsInHand: listener.turnsInHand ?? 0 },
+    holder: { marble, zone: listener.zone, slot: slot ?? null, turnsInHand: listener.turnsInHand ?? 0, departed: ownTrace ? event.departed : null },
     replacement: event.replacement ?? null,
     tally: run.state.tally,
     state: run.state,

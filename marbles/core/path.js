@@ -6,6 +6,13 @@
 // settleReactions), sans rien importer du déroulé lui-même. Simulation pure.
 
 import { CLAUSE_ACTIONS } from "./effects.js";
+
+// La TRACE d'une bille qui quitte le triangle, ce que ses déclencheurs de sortie, sa
+// Chute et le Tic de la bille qui la déloge peuvent encore lire (les sources wear et
+// turnsOnTriangle) : son usure et ses phases jouées au moment du départ.
+export function departedRecord(placed) {
+  return { wear: placed.wear, phases: placed.phases ?? 0 };
+}
 import { characteristic } from "./statuses.js";
 
 // La PLACE LIBRE en main : la taille de main en vigueur (statuts compris) moins les
@@ -87,11 +94,16 @@ function originFields(from) {
 //                sortie, elle en partance : l'arrivée de la bille posée et son Tic,
 //                pour un remplacement (marbles/core/marbles.js/placeMarble).
 export function travel(run, { marble, from, cause, exit = null, destination = "discard", by = null, movedBy = null, meanwhile = null }) {
+  // Depuis le triangle, la TRACE de la bille (son usure, ses phases jouées), que
+  // portent son déclencheur de sortie et son arrivée à la défausse : son Final, son
+  // Éjection et sa Chute la lisent encore (`departed`, la source wear).
+  const placed = from.zone === "triangle" ? run.state.triangle[from.slot] : null;
+  const departed = placed === null ? null : departedRecord(placed);
   const departure = ORIGINS[from.zone](run, from, marble, cause);
-  const moving = { kind: "leaving", marble, slot: from.slot ?? null, destination, by, movedBy, redirected: false };
+  const moving = { kind: "leaving", marble, slot: from.slot ?? null, destination, by, movedBy, redirected: false, departed };
   run.inTransit = [...run.inTransit, moving];
   if (meanwhile !== null) meanwhile();
-  if (exit !== null) run.settle(exit);
+  if (exit !== null) run.settle(departed === null ? exit : { ...exit, departed });
   // Les réactions au départ (un départ du triangle), après le déclencheur de sortie :
   // la bille concernée joue d'abord son effet.
   if (departure !== undefined) run.settleReactions(departure);
@@ -137,7 +149,8 @@ function arrive(run, moving, from, cause) {
   // prévision rattache l'arrivée, et sa Chute, à cet effet.
   run.update({ discard: [...run.state.discard, moving.marble] });
   const handFull = moving.destination === "hand" ? { handFull: true } : {};
-  run.settle({ type: "discarded", marble: moving.marble, ...origin, cause, ...handFull, ...marks, ...(moving.by === null ? {} : { by: moving.by }) });
+  const trace = moving.departed === null ? {} : { departed: moving.departed };
+  run.settle({ type: "discarded", marble: moving.marble, ...origin, cause, ...handFull, ...marks, ...trace, ...(moving.by === null ? {} : { by: moving.by }) });
 }
 
 // LES DÉPLACEMENTS d'une action qui en fait (CLAUSE_ACTIONS, `moves` : Empocher,
@@ -219,7 +232,7 @@ export function ejectFromSlot(run, slot, by) {
   }
   const { marble } = placed;
   run.emit({ type: "eject", slot, marble, by });
-  const exit = { type: "knockout", slot, marble, replacement: { placed: by.marble, ejected: marble }, by };
+  const exit = { type: "knockout", slot, marble, replacement: { placed: by.marble, ejected: marble, departed: departedRecord(placed) }, by };
   travel(run, { marble, from: { zone: "triangle", slot }, cause: "eject", exit });
 }
 

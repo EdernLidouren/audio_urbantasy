@@ -79,8 +79,12 @@
 // il se lit, il ne se rejoue jamais. Tant qu'un choix attend, toute autre action est
 // refusée (`choicePending`).
 // bag et discard sont des listes d'ids de billes (doublons permis). Une bille
-// n'a d'usure que SUR le triangle, { marble, wear, bonus? } : une bille qui en
-// sort perd donc son usure et son bonus par construction. `bonus`
+// n'a d'usure que SUR le triangle, { marble, wear, phases?, bonus? } : une bille qui
+// en sort perd donc son usure et son bonus par construction (son trajet en garde
+// une trace le temps de son départ, marbles/core/path.js/travel, `departed`).
+// `phases`, absent à son arrivée (0), compte les phases qu'elle a jouées : les tours
+// passés sur le triangle (la source turnsOnTriangle) ; il suit la bille dans un
+// échange et dans la rotation. `bonus`
 // ({ speed, mass }), présent seulement si une autre bille lui en a donné un, va
 // avec la bille dans un échange et disparaît à la fin de la résolution.
 // De même, une bille n'a de compteur de tours en main que DANS la main,
@@ -142,7 +146,7 @@ import { NO_BAGS, bagProblems, describeProblem, validateBagFormat } from "./bags
 import { BAG_BUILD_RULES } from "../config/values.js";
 import { drawMarbles, holdReactions, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
 import { answerOf, chooseRefusal, targetRef } from "./choices.js";
-import { retireMarble, travel } from "./path.js";
+import { departedRecord, retireMarble, travel } from "./path.js";
 import { LOCKS, NO_STATUSES, activatePending, characteristic, endTurn, isLocked, lockingInstance, modifyQuantity, ruleInstance } from "./statuses.js";
 
 export { SLOTS, nextSlot, previousSlot };
@@ -465,7 +469,7 @@ function placeMarble(run, { handIndex, slot }) {
 
   const previous = run.state.triangle[slot];
   // Le remplacement en cours, que Tic et Éjection portent (conditions de calibre).
-  const replacement = previous === null ? null : { placed: marble, ejected: previous.marble };
+  const replacement = previous === null ? null : { placed: marble, ejected: previous.marble, departed: departedRecord(previous) };
   // L'arrivée de la bille lancée : son emplacement, puis, sur un remplacement, son Tic,
   // réglé jusqu'au bout (run.settle) avant l'Éjection de la délogée.
   const arrive = () => {
@@ -495,7 +499,8 @@ function rotated(triangle) {
 
 // Plus de bonus une fois la résolution finie : il ne vaut que pour ce tour.
 function withoutBonus(placed) {
-  return placed === null ? null : { marble: placed.marble, wear: placed.wear };
+  if (placed === null) return null;
+  return placed.phases === undefined ? { marble: placed.marble, wear: placed.wear } : { marble: placed.marble, wear: placed.wear, phases: placed.phases };
 }
 
 function resolvePhases(run) {
@@ -520,7 +525,8 @@ function resolvePhases(run) {
     const maxWear = maxWearOf(marble, run.types);
     const added = intercept(run, modifyQuantity, "phaseWear", 1, sourceOf(run, marble));
     const wear = Math.min(maxWear, after.wear + added.value);
-    run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear } } });
+    // Une phase jouée de plus, usée ou non (une usure ramenée à 0 compte aussi).
+    run.update({ triangle: { ...run.state.triangle, [slot]: { marble, wear, phases: (after.phases ?? 0) + 1 } } });
     run.emit({ type: "wear", slot, marble, wear, maxWear });
     noteModification(run, added, { trigger: "phase", slot, marble });
   }

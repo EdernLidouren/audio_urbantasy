@@ -31,15 +31,42 @@ export const tally = (id, scope) => ({ type: "tally", tally: id, scope });
 
 // Le nombre de billes d'une zone de la partie, source d'un montant calculé
 // (marbles/core/zones.js/GAME_ZONES : "triangle", "hand", "bag", "discard", "pot",
-// "lost"), filtré ou non (un filtre : sizeIs, familyIs, rarityIs) : zoneCount("hand"),
-// « par bille en main » ; zoneCount("triangle", sizeIs(SMALL)), « par minibille
-// active » ; zoneCount("discard", familyIs("mist")), « par Brume à la défausse ».
-export const zoneCount = (zone, ...filters) => ({ type: "zoneCount", zone, ...(filters.length === 0 ? {} : { filters }) });
+// "lost"), filtré ou non (un filtre : sizeIs, familyIs, rarityIs, marbleIs) :
+// zoneCount("hand"), « par bille en main » ; zoneCount("triangle", sizeIs(SMALL)),
+// « par minibille active » ; zoneCount("discard", familyIs("mist")), « par Brume à la
+// défausse ». Plusieurs zones ensemble, en liste : zoneCount(["hand", "triangle"],
+// sizeIs(MEDIUM)), « par bille normale en main et sur le triangle ».
+export const zoneCount = (zone, ...filters) => ({ type: "zoneCount", ...(Array.isArray(zone) ? { zones: zone } : { zone }), ...(filters.length === 0 ? {} : { filters }) });
 
 // Le nombre de familles différentes parmi les billes actives, source d'un montant
 // calculé : « Vitesse +2 par famille différente sur le triangle » :
-// speed({ base: 0, step: 2, source: familyCount(), max: 6 }).
-export const familyCount = () => ({ type: "familyCount" });
+// speed({ base: 0, step: 2, source: familyCount(), max: 6 }). Parmi plusieurs zones
+// ensemble : familyCount(["triangle", "hand"]), « par famille différente sur le
+// triangle et en main ».
+export const familyCount = (zones) => ({ type: "familyCount", ...(zones === undefined ? {} : { zones }) });
+
+// Un compteur du tour ("speed", "mass") au déclenchement, source d'un montant calculé ;
+// négatif, il compte pour 0 : speed({ base: 0, step: 1, source: turnStat("speed"), max:
+// 8 }), « Vitesse égale à la Vitesse du tour, maximum +8 ».
+export const turnStat = (stat) => ({ type: "stat", stat });
+
+// Ce que donne la bille de l'autre base ("speed", "mass"), source d'un montant
+// calculé, dans un effet de base seulement, prise telle quelle : speed({ base: 0, step:
+// 1, source: otherBase("speed") }), « Vitesse égale à la Vitesse que donne la bille de
+// l'autre base ». Un malus se copie aussi.
+export const otherBase = (stat) => ({ type: "otherBase", stat });
+
+// L'usure d'une bille, source d'un montant calculé : la sienne, ou celle de la bille
+// éjectée (`marble: "ejected"`, pendant un remplacement) ; `remaining: true`, ce qui
+// lui reste avant son maximum. Partie du triangle, celle qu'elle avait en partant :
+// speed({ base: 5, step: -1, source: wear() }), « Vitesse +5, −1 par point d'usure de
+// cette bille ».
+export const wear = ({ marble, remaining } = {}) => ({ type: "wear", ...(marble === undefined ? {} : { marble }), ...(remaining === undefined ? {} : { remaining }) });
+
+// Les tours passés sur le triangle par la bille elle-même (les phases qu'elle y a
+// jouées), source d'un montant calculé : speed({ base: 0, step: 2, source:
+// turnsOnTriangle(), max: 10 }).
+export const turnsOnTriangle = () => ({ type: "turnsOnTriangle" });
 
 // L'état d'une zone de la partie, une condition (`when`) : zoneIs("triangle",
 // "full"), « si le triangle est plein » ; états "empty", "full", "single".

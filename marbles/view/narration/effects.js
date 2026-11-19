@@ -394,9 +394,15 @@ const COUNT_TEXTS = {
     const [filter] = source.filters ?? [];
     const names = filter === undefined ? {} : FILTER_REFS[filter.type](filter);
     const noun = t(`marbles.condition.count.noun${filter === undefined ? "" : `_${filter.type}`}`, { count: bound.count, ...names });
+    if (source.zones !== undefined) return t("marbles.condition.count.zones", { bound: bound.bound, noun, ...sourceParams(source, t) });
     return t(`marbles.condition.count.zone.${source.zone}`, { bound: bound.bound, noun });
   },
-  familyCount: (source, bound, t) => t("marbles.condition.count.families", bound),
+  familyCount: (source, bound, t) =>
+    source.zones === undefined ? t("marbles.condition.count.families", bound) : t("marbles.condition.count.families_zones", { ...bound, ...sourceParams(source, t) }),
+  stat: (source, bound, t) => t("marbles.condition.count.stat", { ...bound, stat: source.stat }),
+  otherBase: (source, bound, t) => t("marbles.condition.count.other_base", { bound: bound.bound, value: combined(valueParts({ [source.stat]: bound.count }, t), t) }),
+  wear: (source, bound, t) => t(source.remaining === true ? "marbles.condition.count.wear_remaining" : "marbles.condition.count.wear", { ...bound, marble: source.marble ?? "self" }),
+  turnsOnTriangle: (source, bound, t) => t("marbles.condition.count.turns_on_triangle", bound),
   tally: (source, bound, t) =>
     t("marbles.condition.count.tally", {
       ...bound,
@@ -431,6 +437,7 @@ function slotConditionText(key, when, params, t) {
 const CONDITION_TEXTS = {
   printedStat: (when, t) => {
     const effect = combined(valueParts({ [when.stat]: when.atLeast }, t), t);
+    if (when.slot === KNOCKED_OUT) return t("marbles.condition.printedStat_knocked_out", { effect });
     if (isRelative(when.slot)) return t("marbles.condition.printedStat_relative", { relative: relativeWord(when.slot), effect });
     return t("marbles.condition.printedStat", { slot: slotName(when.slot, t), effect });
   },
@@ -459,9 +466,17 @@ for (const type of new Set([...Object.keys(CONDITIONS), ...Object.keys(CONDITION
 // (marbles/core/effects.js/AMOUNT_SOURCES) : « Vitesse +1 par tour en main »,
 // « Vitesse +1 par minibille active ». `step` : le pas déjà dit.
 function sourceText(source, step, t) {
-  const { text, params, names } = AMOUNT_SOURCES[source.type];
+  const { text, params } = AMOUNT_SOURCES[source.type];
+  return t(typeof text === "function" ? text(source) : text, { effect: step, ...sourceParams(source, t) });
+}
+
+// Les paramètres de texte d'une source : ses valeurs (`params`), ses noms (`names`,
+// des références de nom) et ses listes (`lists`, des textes traduits, dits en liste).
+function sourceParams(source, t) {
+  const { params, names, lists } = AMOUNT_SOURCES[source.type];
   const references = Object.fromEntries(Object.entries(names?.(source) ?? {}).map(([param, key]) => [param, nameRef(key)]));
-  return t(typeof text === "function" ? text(source) : text, { effect: step, ...(params?.(source) ?? {}), ...references });
+  const listed = Object.fromEntries(Object.entries(lists?.(source) ?? {}).map(([param, keys]) => [param, keys.map((key) => t(key))]));
+  return { ...(params?.(source) ?? {}), ...references, ...listed };
 }
 
 // Un nombre d'une action signée (Vitesse, Masse : celles qui ont un texte `down`)
@@ -476,9 +491,19 @@ function amountNumber(action, value) {
 // base, « Vitesse +2, +1 par tour en main… ». La valeur actuelle, dans `situation`,
 // seulement pour une source qui la connaît hors de tout déclenchement (`current`).
 function computedText(action, amount, situation, t) {
+  // Prise telle quelle (base 0, pas 1), une source qui le dit à sa façon : « Vitesse
+  // égale à la Vitesse du tour ».
+  const { wholeText } = AMOUNT_SOURCES[amount.source.type];
+  if (wholeText !== undefined && amount.base === 0 && amount.step === 1) return finishComputed(action, amount, t(wholeText, { action, ...sourceParams(amount.source, t) }), situation, t);
   const step = amount.base === 0 ? combined(valueParts({ [action]: amount.step }, t), t) : amountNumber(action, amount.step);
   let text = sourceText(amount.source, step, t);
   if (amount.base !== 0) text = t("marbles.effect.computed_base", { base: combined(valueParts({ [action]: amount.base }, t), t), effect: text });
+  return finishComputed(action, amount, text, situation, t);
+}
+
+// La fin d'un montant calculé : son maximum, puis sa valeur actuelle s'il y a lieu.
+function finishComputed(action, amount, said, situation, t) {
+  let text = said;
   if (amount.max !== undefined) text = t("marbles.effect.computed_max", { effect: text, max: amountNumber(action, amount.max) });
   // Sans situation (une fiche hors de toute partie : l'annexe des règles), jamais de
   // valeur actuelle.

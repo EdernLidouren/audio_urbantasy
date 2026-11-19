@@ -69,7 +69,9 @@
 //   amount  la valeur : un entier, ou un MONTANT CALCULÉ { base, step, source,
 //           max? }, base + step × la valeur de la source, plafonné à max, évalué
 //           au déclenchement (sources : turnsInHand(), tally(valeur, portée),
-//           zoneCount(zone, filtre?), familyCount()) ;
+//           zoneCount(zone ou [zones], filtre?), familyCount([zones]?),
+//           turnStat(compteur), otherBase(compteur), wear({ marble?, remaining? }),
+//           turnsOnTriangle()) ; un pas négatif pour la Vitesse et la Masse ;
 //   target  (facultatif) un emplacement ; une cible relative (NEXT_SLOT,
 //           PREVIOUS_SLOT) ; un CHOIX du joueur, choice({ zones, count, mode }) ;
 //           « toutes les billes actives », allActive(...filtres) ; et ce que

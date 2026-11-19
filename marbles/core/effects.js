@@ -43,7 +43,11 @@
 //                hors de toute partie ;
 //   statuses     la table des statuts (marbles/core/statuses.js), que lit la capacité
 //                en vigueur d'une zone (ses caractéristiques) ; absente : aucune ;
-//   holder       la bille qui joue l'effet, { marble, zone, turnsInHand } : `zone`
+//   holder       la bille qui joue l'effet, { marble, zone, slot, turnsInHand,
+//                departed } : `slot`, l'emplacement d'où elle agit (null hors du
+//                triangle et sans référence) ; `departed`, sa trace si elle vient de
+//                quitter le triangle ({ wear, phases }, marbles/core/path.js/
+//                departedRecord ; son Final, son Éjection, sa Chute), null sinon ; `zone`
 //                dit où elle est (HOLDER_ZONES : "triangle" ; "leaving", en
 //                partance, le Final et l'Éjection ; "discard", à la défausse, la
 //                Chute ; "thrown", en cours de lancer, la
@@ -52,7 +56,10 @@
 //                compteur de tours en main (0 hors de la main ; pendant son lancer,
 //                celui qu'elle avait en la quittant) ;
 //   replacement  pendant un Tic ou une Éjection, le remplacement en cours,
-//                { placed, ejected } (deux ids de bille) ; null sinon ;
+//                { placed, ejected, departed } (deux ids de bille, et la trace de
+//                l'éjectée) ; null sinon ;
+//   copying      (facultatif) vrai pendant l'évaluation d'un effet pour la source
+//                otherBase : une copie n'en copie jamais une autre ;
 //   tally        les valeurs de partie à cet instant (marbles/core/tally.js), lues
 //                par tallyValue seulement.
 //
@@ -99,7 +106,7 @@
 // l'action (`{ speed, mass, draw }`). Le core les applique (marbles/core/run.js/fireEffect),
 // la vue les dit, la prévision les rend.
 
-import { MARBLE_FAMILIES, MARBLE_RARITIES, MARBLE_SIZES } from "../config/values.js";
+import { MARBLES_SETTINGS, MARBLE_FAMILIES, MARBLE_RARITIES, MARBLE_SIZES } from "../config/values.js";
 import { rejectUnknownFields } from "../../lib/validate.js";
 import { TALLY_SCOPES, tallyValue } from "./tally.js";
 import { NO_STATUSES, STATUS_DURATIONS, definitionOf, statusApplication } from "./statuses.js";
@@ -221,9 +228,18 @@ function validateAmount(clause, describe, fail, context, minimum) {
   rejectUnknownFields(amount, ["base", "step", "source", "max"], where, fail);
   if (!Number.isInteger(amount.base)) fail(`${where} : base doit être un entier.`);
   if (minimum !== undefined && amount.base < minimum - 1) fail(`${where} : base doit être un entier >= ${minimum - 1}.`);
-  if (!Number.isInteger(amount.step) || amount.step < 1) fail(`${where} : step doit être un entier >= 1.`);
+  // Un pas NÉGATIF (« Vitesse +5, −1 par point d'usure ») : seulement pour une valeur
+  // signée (Vitesse, Masse : sans minimum), et sans plafond, qui n'aurait plus de sens.
+  if (!Number.isInteger(amount.step) || amount.step === 0) fail(`${where} : step doit être un entier non nul.`);
+  if (amount.step < 0 && minimum !== undefined) fail(`${where} : un pas négatif ne vaut que pour la Vitesse et la Masse.`);
+  if (amount.step < 0 && amount.max !== undefined) fail(`${where} : un pas négatif n'a pas de maximum.`);
   if (amount.max !== undefined && (!Number.isInteger(amount.max) || amount.max <= amount.base)) fail(`${where} : max doit être un entier plus grand que base.`);
   validateRule(amount.source, AMOUNT_SOURCES, "source", where, fail, context);
+  const source = AMOUNT_SOURCES[amount.source.type];
+  // Une source SIGNÉE peut valoir moins de 0 : seulement pour une valeur signée.
+  if (source.signed && minimum !== undefined) fail(`${where} : la source "${amount.source.type}" peut être négative, elle ne vaut que pour la Vitesse et la Masse.`);
+  // Une source ENTIÈRE ne se lit que telle quelle : base 0, pas 1 (« Vitesse égale à… »).
+  if (source.whole && (amount.base !== 0 || amount.step !== 1)) fail(`${where} : la source "${amount.source.type}" se prend telle quelle (base 0, step 1).`);
 }
 
 function validateInteger(clause, describe, fail, context) {
@@ -741,18 +757,27 @@ function validateZone(zone, describe, fail) {
 // d'effet, voir targetProblem), et son test sur la situation (en-tête).
 export const CONDITIONS = {
   // La bille à `slot` a-t-elle, IMPRIMÉ à cet emplacement, au moins `atLeast`
-  // de `stat` ? Emplacement vide : non, il n'y a rien à lire.
+  // de `stat` ? Emplacement vide : non, il n'y a rien à lire. Dans un Tic, `slot`
+  // peut être la bille éjectée (KNOCKED_OUT) : son effet imprimé à l'emplacement
+  // qu'elle vient de quitter, celui de la bille qui la déloge.
   printedStat: {
     fields: ["type", "slot", "stat", "atLeast"],
     validate(when, describe, fail, context) {
-      validateConditionSlot(when.slot, describe, fail, context);
+      if (when.slot === KNOCKED_OUT) {
+        if (context.trigger !== "hit") fail(`${describe} : la bille éjectée ne se lit que dans un Tic.`);
+      } else validateConditionSlot(when.slot, describe, fail, context);
       if (!Object.hasOwn(CLAUSE_ACTIONS, when.stat)) fail(`${describe} : statistique inconnue "${when.stat}".`);
       // Seule une action à montant s'imprime : sur Empocher ou Éjecter, la condition
       // vaudrait toujours 0, jamais vraie dès « au moins 1 ».
       if (!CLAUSE_ACTIONS[when.stat].fields.includes("amount")) fail(`${describe} : "${when.stat}" n'a pas de montant, il n'y a rien d'imprimé à lire.`);
       if (!Number.isInteger(when.atLeast)) fail(`${describe} : atLeast doit être un entier.`);
     },
-    test(when, { triangle }, types) {
+    test(when, { triangle, holder, replacement }, types) {
+      if (when.slot === KNOCKED_OUT) {
+        const ejected = replacement?.ejected ?? null;
+        if (ejected === null || !SLOTS.includes(holder?.slot)) return false;
+        return printedStat(effectAt(ejected, holder.slot, types), when.stat) >= when.atLeast;
+      }
       // Un emplacement relatif sans référence (resolveClauses) : rien à lire.
       const placed = triangle[when.slot] ?? null;
       if (placed === null) return false;
@@ -940,7 +965,17 @@ export function referencedMarbles(data) {
 // Chaque SOURCE d'un montant calculé (en-tête), déclarée ICI ET NULLE PART AILLEURS :
 //   fields    ses champs ;
 //   validate  leur validation ;
-//   value     sa valeur dans la situation, un entier >= 0, (source, situation, types) ;
+//   value     sa valeur dans la situation, un entier >= 0 (sauf `signed`),
+//             (source, situation, types) ;
+//   signed    (facultatif) sa valeur peut être négative : seulement pour la Vitesse
+//             et la Masse (validateAmount) ;
+//   whole     (facultatif) elle ne se prend que telle quelle, base 0 et pas 1 ;
+//   wholeText (facultatif) son gabarit quand elle se prend telle quelle (base 0, pas
+//             1), « Vitesse égale à la Vitesse du tour » : il reçoit {action}, la
+//             valeur produite (speed, mass), au lieu de {effect} ;
+//   lists     (facultatif) ses paramètres de texte qui sont des LISTES de textes, par
+//             clés i18n, (source) -> { param: [clés] } : « en main et sur le
+//             triangle » ;
 //   text      son gabarit i18n, après le pas, ou (source) -> gabarit : il reçoit
 //             {effect} (« Vitesse +1 »), puis les paramètres de `params` et les
 //             références de nom de `names` ;
@@ -975,32 +1010,127 @@ export const AMOUNT_SOURCES = {
   // cours de lancer (sa Chiquenaude). Sa valeur se connaît hors de tout
   // déclenchement, dans la partie en cours (`current`, `needsState` : la fiche la lit
   // dans l'état).
+  // PLUSIEURS ZONES (`zones`, au lieu de `zone`) : leurs billes additionnées, « par
+  // bille normale en main et sur le triangle ».
   zoneCount: {
-    fields: ["type", "zone", "filters"],
+    fields: ["type", "zone", "zones", "filters"],
     validate(source, describe, fail) {
-      validateZone(source.zone, describe, fail);
+      validateZoneChoice(source, describe, fail);
       if (source.filters !== undefined) validateFilters(source.filters, `${describe}, filtres du nombre de billes`, fail);
     },
-    value: (source, { state }, types) => GAME_ZONES[source.zone].marbles(state).filter((marble) => passesFilters(marble, source.filters, types)).length,
+    value: (source, { state }, types) => zoneMarbles(source, state).filter((marble) => passesFilters(marble, source.filters, types)).length,
     // Un gabarit par type de filtre, `marbles.effect.per_zone_<filtre>` ; le calibre a
     // le sien sur le triangle (« par calot actif » : l'accord suit le calibre), comme
     // une bille précise (« par abeille active ») : GENDERED_FILTERS.
-    text: (source) => (source.filters === undefined ? "marbles.effect.per_zone" : `marbles.effect.per_zone_${source.filters[0].type}${GENDERED_FILTERS.has(source.filters[0].type) && source.zone === "triangle" ? "_triangle" : ""}`),
-    params: (source) => ({ zone: source.zone }),
+    text: (source) => {
+      const filter = source.filters === undefined ? "" : `_${source.filters[0].type}`;
+      if (source.zones !== undefined) return `marbles.effect.per_zones${filter}`;
+      return `marbles.effect.per_zone${filter}${filter !== "" && GENDERED_FILTERS.has(source.filters[0].type) && source.zone === "triangle" ? "_triangle" : ""}`;
+    },
+    params: (source) => (source.zones === undefined ? { zone: source.zone } : {}),
+    lists: (source) => (source.zones === undefined ? {} : { zones: zonePhrases(source.zones) }),
     names: (source) => (source.filters === undefined ? {} : FILTER_NAMES[source.filters[0].type](source.filters[0])),
     current: true,
     needsState: true,
   },
   // Le nombre de FAMILLES DIFFÉRENTES parmi les billes actives (distinctFamilies) :
   // toutes les familles comptent, Classiques comprises ; une bille à plusieurs
-  // familles compte pour chacune ; une bille en transit ne compte pas.
+  // familles compte pour chacune ; une bille en transit ne compte pas. `zones`
+  // (facultatif, au moins deux) : parmi les billes de ces zones ensemble, « par
+  // famille différente sur le triangle et en main ».
   familyCount: {
-    fields: ["type"],
-    validate() {},
-    value: (source, { state }, types) => distinctFamilies(GAME_ZONES.triangle.marbles(state), types),
-    text: "marbles.effect.per_family",
+    fields: ["type", "zones"],
+    validate(source, describe, fail) {
+      if (source.zones !== undefined) validateZoneList(source.zones, describe, fail);
+    },
+    value: (source, { state }, types) => distinctFamilies(zoneMarbles(source.zones === undefined ? { zone: "triangle" } : source, state), types),
+    text: (source) => (source.zones === undefined ? "marbles.effect.per_family" : "marbles.effect.per_family_zones"),
+    lists: (source) => (source.zones === undefined ? {} : { zones: zonePhrases(source.zones) }),
     current: true,
     needsState: true,
+  },
+  // Un COMPTEUR DU TOUR (TURN_STATS : "speed", "mass") au déclenchement, avant
+  // l'effet qui le lit ; négatif, il compte pour 0. « Vitesse égale à la Vitesse du
+  // tour, maximum +8 » (base 0, pas 1), « Vitesse +2 par point de Masse du tour ».
+  stat: {
+    fields: ["type", "stat"],
+    validate(source, describe, fail) {
+      validateTurnStat(source.stat, describe, fail);
+    },
+    value: (source, { state }) => Math.max(0, state?.[source.stat] ?? 0),
+    text: "marbles.effect.per_stat",
+    wholeText: "marbles.effect.equal_stat",
+    params: (source) => ({ stat: source.stat }),
+    current: true,
+    needsState: true,
+  },
+  // Ce que DONNE LA BILLE DE L'AUTRE BASE, `stat` ("speed", "mass") : son effet de
+  // phase à son emplacement, joué comme s'il jouait au déclenchement (conditions,
+  // sinon et montants calculés compris, sans bonus reçu ni statut), sans rien
+  // appliquer. Un malus se copie aussi (signée). Emplacement vide, ou une copie
+  // pendant une copie (deux billes qui se copieraient l'une l'autre) : 0. Seulement
+  // dans un effet de base, telle quelle : « Vitesse égale à celle que donne la bille
+  // de l'autre base ».
+  otherBase: {
+    fields: ["type", "stat"],
+    signed: true,
+    whole: true,
+    validate(source, describe, fail, context) {
+      validateTurnStat(source.stat, describe, fail);
+      const bases = ["leftBase", "rightBase"];
+      if (!(context?.phaseSlots?.length > 0 && context.phaseSlots.every((slot) => bases.includes(slot)))) fail(`${describe} : otherBase ne vaut que dans un effet de base.`);
+    },
+    value(source, situation, types) {
+      const other = OTHER_BASE[situation.holder?.slot];
+      const placed = other === undefined ? null : (situation.triangle?.[other] ?? null);
+      if (placed === null || situation.copying === true) return 0;
+      const copied = { ...situation, holder: { marble: placed.marble, zone: "triangle", slot: other, turnsInHand: 0, departed: null }, replacement: null, copying: true };
+      return evaluateEffect(resolveClauses(effectAt(placed.marble, other, types), other), copied, types).self[source.stat];
+    },
+    text: "marbles.effect.equal_other_base",
+    wholeText: "marbles.effect.equal_other_base",
+    params: (source) => ({ stat: source.stat }),
+    current: false,
+  },
+  // L'USURE d'une bille : la sienne (`marble` absent), ou celle de la bille éjectée
+  // (`marble: "ejected"`, pendant un remplacement) ; `remaining` (facultatif, true) :
+  // ce qui lui reste avant son maximum. Sur le triangle, son usure du moment ; partie
+  // du triangle (son Final, son Éjection, sa Chute ; l'éjectée pendant le Tic), celle
+  // qu'elle avait en partant (sa trace, `departed`) ; sans usure (jamais posée) : 0.
+  // « Chute : Vitesse +5, −1 par point d'usure de cette bille », « Tic : … si la bille
+  // éjectée a au plus 1 point d'usure restant ».
+  wear: {
+    fields: ["type", "marble", "remaining"],
+    validate(source, describe, fail, context) {
+      if (source.remaining !== undefined && source.remaining !== true) fail(`${describe} : remaining vaut true, ou s'omet.`);
+      if (source.marble !== undefined && source.marble !== "ejected") fail(`${describe} : marble vaut "ejected", ou s'omet (la bille elle-même).`);
+      if (source.marble === "ejected" && context?.replacement !== true) fail(`${describe} : l'usure de la bille éjectée ne se lit que pendant un remplacement (Tic, Éjection).`);
+      if (source.marble === undefined && context !== undefined && WEARLESS_ZONES.includes(holderZoneOf(context).zone)) fail(`${describe} : la bille n'a pas d'usure ici : ${holderZoneOf(context).where}.`);
+    },
+    value(source, situation, types) {
+      const { marble, trace } = wearSubject(source, situation);
+      if (marble === null || trace === null) return 0;
+      return source.remaining === true ? Math.max(0, (types[marble].maxWear ?? MARBLES_SETTINGS.defaultMaxWear) - trace.wear) : trace.wear;
+    },
+    text: (source) => (source.remaining === true ? "marbles.effect.per_wear_remaining" : "marbles.effect.per_wear"),
+    params: (source) => ({ marble: source.marble ?? "self" }),
+    current: false,
+  },
+  // Les TOURS PASSÉS SUR LE TRIANGLE par la bille elle-même : les phases qu'elle y a
+  // jouées (`phases`), celle de ce tour comprise une fois jouée ; partie du triangle,
+  // celles d'avant son départ (sa trace). « Final : Vitesse +2 par tour passé sur le
+  // triangle, maximum +10 ».
+  turnsOnTriangle: {
+    fields: ["type"],
+    validate(source, describe, fail, context) {
+      if (context !== undefined && WEARLESS_ZONES.includes(holderZoneOf(context).zone)) fail(`${describe} : la bille n'est pas passée par le triangle ici : ${holderZoneOf(context).where}.`);
+    },
+    value(source, situation) {
+      const { trace } = wearSubject({}, situation);
+      return trace === null ? 0 : trace.phases;
+    },
+    text: "marbles.effect.per_turn_on_triangle",
+    current: false,
   },
   // Une VALEUR DE PARTIE (marbles/core/counters.js) dans une portée : « par
   // chiquenaude ce tour », { type: "tally", tally: "flick", scope: "turn" }. Sa
@@ -1020,6 +1150,55 @@ export const AMOUNT_SOURCES = {
   },
 };
 
+
+// L'autre base, depuis une base.
+const OTHER_BASE = { leftBase: "rightBase", rightBase: "leftBase" };
+
+// Les zones d'où une bille n'a jamais d'usure à lire : en main (son Éveil), en cours
+// de lancer, dans le pot, ou sans bille (un statut).
+const WEARLESS_ZONES = ["hand", "thrown", "pot", "status"];
+
+// La bille dont une source lit l'usure, et sa TRACE ({ wear, phases }) : sur le
+// triangle, son entrée du moment ; partie, sa trace de départ ; l'éjectée d'un
+// remplacement, la trace que porte le remplacement. -> { marble, trace }, trace null
+// sans usure à lire.
+function wearSubject(source, { holder, triangle, replacement }) {
+  if (source.marble === "ejected") return { marble: replacement?.ejected ?? null, trace: replacement?.departed ?? null };
+  if (holder?.zone === "triangle") {
+    const placed = triangle?.[holder.slot] ?? null;
+    return { marble: holder.marble, trace: placed === null || placed.marble !== holder.marble ? null : { wear: placed.wear, phases: placed.phases ?? 0 } };
+  }
+  return { marble: holder?.marble ?? null, trace: holder?.departed ?? null };
+}
+
+// Un compteur du tour (TURN_STATS) connu ?
+function validateTurnStat(stat, describe, fail) {
+  if (!TURN_STATS.includes(stat)) fail(`${describe} : compteur du tour inconnu "${stat}" (${TURN_STATS.join(", ")}).`);
+}
+
+// Une liste de zones de la partie : au moins deux, connues, chacune une fois.
+function validateZoneList(zones, describe, fail) {
+  if (!Array.isArray(zones) || zones.length < 2) fail(`${describe} : zones est une liste d'au moins deux zones.`);
+  for (const zone of zones) validateZone(zone, describe, fail);
+  if (new Set(zones).size !== zones.length) fail(`${describe} : une zone en double.`);
+}
+
+// Le nombre de billes : une zone (`zone`), ou plusieurs (`zones`), jamais les deux.
+function validateZoneChoice(source, describe, fail) {
+  if ((source.zone === undefined) === (source.zones === undefined)) fail(`${describe} : une zone (zone) ou plusieurs (zones), exactement.`);
+  if (source.zone !== undefined) validateZone(source.zone, describe, fail);
+  else validateZoneList(source.zones, describe, fail);
+}
+
+// Les billes d'une zone (`zone`) ou de plusieurs (`zones`), dans l'état.
+function zoneMarbles(source, state) {
+  return (source.zones ?? [source.zone]).flatMap((zone) => GAME_ZONES[zone].marbles(state));
+}
+
+// Les clés de texte de zones, « en main », « sur le triangle » (une liste dite).
+function zonePhrases(zones) {
+  return zones.map((zone) => `marbles.zone_where.${zone}`);
+}
 
 // Les filtres dont le nom porte le genre (le calibre, une bille précise) : sur le
 // triangle, « actif » ou « active » s'accorde avec lui, un gabarit à part.

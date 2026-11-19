@@ -279,6 +279,9 @@ Défausser, Rebond, Ramasser), `marbles-zones` (conditions d'état et nombre de 
 zone), `marbles-conditions` (le sinon, la négation, la bille précise et son filtre,
 l'emplacement vide ou occupé, le calibre d'une bille d'un remplacement, un nombre comparé à
 une borne, les compteurs du tour, et leurs textes dans chaque vraie langue),
+`marbles-amounts` (le pas négatif, plusieurs zones, le compteur du tour, l'autre base,
+l'usure et la trace de départ, les tours passés sur le triangle, l'effet imprimé de
+l'éjectée, et leurs textes dans chaque vraie langue),
 `marbles-families` (familles et raretés : validation, filtres, conditions
 d'emplacement, nombre de billes filtré, familles différentes, leurs textes et la touche
 F), `marbles-relative` (les cibles relatives), `marbles-statuses` (les statuts :

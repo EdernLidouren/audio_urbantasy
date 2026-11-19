@@ -31,7 +31,7 @@ Une partie se joue selon sa **définition** (section 13) : ses valeurs de dépar
 - **En poche** : une bille dans le pot.
 - **Perdue** : une bille envoyée au pot plein.
 
-Une bille ne garde rien en changeant de zone : en quittant le triangle, elle perd son usure et son bonus ; en quittant la main, elle perd son compteur de tours en main.
+Une bille ne garde rien en changeant de zone : en quittant le triangle, elle perd son usure et son bonus ; en quittant la main, elle perd son compteur de tours en main. Seuls ses propres effets de départ (son Final, son Éjection, sa Chute) et le Tic de la bille qui la chasse lisent encore l'usure et les tours passés sur le triangle qu'elle avait en partant.
 
 ### Les billes en transit
 
@@ -310,7 +310,7 @@ Une action qui vise un emplacement peut viser, au lieu d'un emplacement fixe, l'
 
 Une clause peut porter une condition, évaluée au moment où l'effet joue ; fausse, la clause ne produit rien, ou joue son remplacement si elle en a un (« sinon », plus bas). Les sortes de conditions :
 
-- **l'effet imprimé d'une autre bille** : la bille d'un emplacement donne au moins une certaine valeur, à cet emplacement. Seul compte ce qui est imprimé sur la bille, jamais un effet déjà modifié ;
+- **l'effet imprimé d'une autre bille** : la bille d'un emplacement donne au moins une certaine valeur, à cet emplacement. Seul compte ce qui est imprimé sur la bille, jamais un effet déjà modifié. Dans un Tic, la bille lue peut être la bille éjectée, à l'emplacement qu'elle vient de quitter : « Tic : … si l'effet de la bille éjectée donne au moins Masse +1 » ;
 - **le calibre relatif**, pendant un remplacement seulement : la bille posée ou la bille chassée est plus petite, ou plus grosse, que l'autre. Quand c'est un effet Éjecter qui chasse, la bille qui éjecte tient le rôle de la bille posée, où qu'elle soit ;
 - **le calibre d'un emplacement** : la bille d'un emplacement est d'un calibre donné. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est un calot » ;
 - **la famille d'un emplacement** : la bille d'un emplacement est d'une famille donnée, parmi d'autres peut-être. L'emplacement peut être relatif : « si la bille de l'emplacement suivant est de la famille Brume » ;
@@ -331,9 +331,15 @@ Les conditions sur la bille d'un emplacement (son calibre, sa famille, sa raret�
 Un montant peut dépendre du moment, par exemple « Vitesse +1 par minibille active ». Il se calcule au déclenchement, avec un plafond éventuel, à partir de :
 
 - **les tours en main** de la bille elle-même ;
+- **les tours passés sur le triangle** par la bille elle-même : une phase jouée, un tour. Partie du triangle, ceux qu'elle avait en partant. « Final : Vitesse +2 par tour passé sur le triangle, maximum +10. » ;
+- **l'usure** de la bille elle-même, ou de la bille éjectée pendant un remplacement, ou ce qui leur reste avant leur maximum. Partie du triangle, l'usure qu'elle avait en partant ; jamais posée, 0. « Chute : Vitesse +5, −1 par point d'usure de cette bille. » ;
+- **la Vitesse ou la Masse du tour**, quand l'effet joue, avant ce qu'il produit ; négative, elle compte pour 0. « Tic : Vitesse égale à la Vitesse du tour, maximum +8. » ;
+- **ce que donne la bille de l'autre base**, dans un effet de base seulement : son effet de base, joué comme s'il jouait à ce moment, conditions comprises, sans bonus reçu ni statut, un malus compris. L'autre base vide : 0. Deux billes qui se copieraient l'une l'autre ne copient rien. « Base : Vitesse égale à la Vitesse que donne la bille de l'autre base. » ;
 - **une valeur de partie**, ce tour ou cette partie (section 10) ;
-- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues ; toutes, ou seulement celles d'un calibre, d'une famille, d'une rareté, ou une bille précise (« par minibille active », « par Brume à la défausse », « par bille rare en main », « par abeille dans le pot »). Une bille active compte, la bille elle-même comprise si elle est sur le triangle ; une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » ;
-- **le nombre de familles différentes** parmi les billes actives : chaque famille compte une fois, Classiques comprises ; une bille à plusieurs familles compte pour chacune ; une bille en transit ne compte pas. « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. ».
+- **le nombre de billes d'une zone** : actives, en main, dans le sac, à la défausse, dans le pot, perdues ; toutes, ou seulement celles d'un calibre, d'une famille, d'une rareté, ou une bille précise (« par minibille active », « par Brume à la défausse », « par bille rare en main », « par abeille dans le pot ») ; d'une zone, ou de plusieurs ensemble (« par bille normale en main et sur le triangle »). Une bille active compte, la bille elle-même comprise si elle est sur le triangle ; une bille en transit ne compte nulle part. La fiche dit la valeur actuelle : « Base : Vitesse +1 par bille en main, maximum +5, actuellement +3. » ;
+- **le nombre de familles différentes** parmi les billes actives, ou parmi celles de plusieurs zones ensemble : chaque famille compte une fois, Classiques comprises ; une bille à plusieurs familles compte pour chacune ; une bille en transit ne compte pas. « Pointe : Vitesse +2 par famille différente sur le triangle, maximum +6. », « par famille différente sur le triangle et en main ».
+
+Un montant peut aussi diminuer avec ce qu'il compte, pour la Vitesse et la Masse seulement : « Vitesse +5, −1 par point d'usure de cette bille ».
 
 Un montant qui vaut 0 ne produit rien.
 
