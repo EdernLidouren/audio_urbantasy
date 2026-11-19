@@ -69,7 +69,7 @@ const seed = seedOption === undefined ? Math.floor(Math.random() * 2 ** 32) : /^
 installFileFetch();
 const { t, setLocale } = await import("../../data/i18n/index.js");
 const { SLOTS } = await import("../core/marbles.js");
-const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeGoal, describeHandFocus, describeOpening, describeOverview, describeSlotFocus, describeTurn, placementLines, refusalText } = await import(
+const { buildSteps, resolutionSteps, describeBag, describeChoicePrompt, describeDiscard, describeGoal, describeHandFocus, describeOpening, describeOverview, describeSlotFocus, describeTurn, describeScore, describeCharacteristics, placementLines, refusalText } = await import(
   "../view/narration.js"
 );
 const { marbleCard } = await import("../view/card.js");
@@ -178,7 +178,7 @@ function printMarble(marble, main, turnsInHand = 0) {
 
 function printState() {
   console.log(`${describeBag(game, GAME_RULES, t)} ${describeDiscard(game, t)}`);
-  console.log(describeTurn(game, GAME_RULES.swapRefusal(game) === null, GAME_RULES, t));
+  console.log(`${describeTurn(game, t)} ${describeScore(game, GAME_RULES.swapRefusal(game) === null, GAME_RULES, t)} ${describeCharacteristics(game, GAME_RULES, t)}`);
   for (const slot of SLOTS) {
     const placed = game.triangle[slot];
     if (placed === null) console.log(`  ${describeSlotFocus(game, slot, GAME_RULES, t)}`);

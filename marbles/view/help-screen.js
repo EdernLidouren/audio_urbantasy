@@ -12,13 +12,17 @@ import { announce } from "../../lib/announce.js";
 import { popScreen, pushScreen } from "../../lib/screens.js";
 import { makeMenuScreen } from "../../lib/menu.js";
 import { t } from "../../data/i18n/index.js";
+import { swapAllowed } from "../core/definitions.js";
 
 // Les rubriques, dans l'ordre du menu : `marbles.help.<id>.title` et `.text`.
 export const MARBLES_HELP_TOPICS = ["goal", "score", "triangle", "wear", "hand", "zones", "keywords", "statuses"];
 
-// Les valeurs que les textes citent : les valeurs de départ de la définition.
-function helpParams({ turns, start }) {
-  return { turns, hand: start.handSize, throws: start.throws, firstDraw: start.firstTurnDraw, draw: start.drawPerTurn, pot: start.potCapacity };
+// Les valeurs que les textes citent : les valeurs de départ de la définition, et si
+// l'échange y est permis (« yes », « no » : la phrase qui le présente n'est dite
+// que s'il l'est).
+function helpParams(definition) {
+  const { turns, start } = definition;
+  return { turns, hand: start.handSize, throws: start.throws, firstDraw: start.firstTurnDraw, draw: start.drawPerTurn, pot: start.potCapacity, swap: swapAllowed(definition) ? "yes" : "no" };
 }
 
 // Le texte d'une rubrique, tel qu'il se dit, pour la définition de la partie.

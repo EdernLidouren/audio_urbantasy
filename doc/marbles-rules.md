@@ -91,7 +91,7 @@ Les planchers ne valent qu'au calcul final. Pendant le tour, une Vitesse de moin
 ## 4. Les caractéristiques du joueur
 
 - **Taille de la main** : 5 billes. Une pioche qui trouve la main pleine s'arrête, et la bille reste au sac.
-- **Lancers par tour** : 5. Chaque pose depuis la main est un lancer ; l'échange n'en est pas un.
+- **Lancers par tour** : 5. Chaque pose depuis la main est un lancer.
 - **Capacité du pot** : 3 billes.
 - **Pioche** : 5 billes au premier tour, 1 à chaque tour suivant.
 - **Nombre de tours** : 10.
@@ -110,11 +110,12 @@ Ce sont les valeurs de la partie habituelle ; une autre définition de partie pe
 
 ### La phase de jeu
 
-Le joueur fait ensuite, dans l'ordre qu'il veut, sauf pour l'échange :
+Le joueur fait ensuite, dans l'ordre qu'il veut :
 
-- **un échange**, facultatif, une fois par tour, avant toute pose. Il échange le contenu de deux emplacements, usure et bonus compris. Avec un emplacement vide, c'est un déplacement. Échanger deux emplacements vides est refusé. L'échange ne déclenche rien.
 - **des poses**, dans la limite des lancers. Le joueur pose une bille de sa main sur un emplacement, vide ou occupé (section 9 pour l'ordre exact). Rien ne l'oblige à remplir le triangle.
 - **la résolution**, à tout moment, quel que soit le triangle, plein, partiel ou vide.
+
+L'**échange** de deux emplacements est retiré du jeu actuel ; le moteur le garde, et une définition de partie peut le permettre (section 13). Il est alors facultatif, une fois par tour, avant toute pose. Il échange le contenu de deux emplacements, usure et bonus compris. Avec un emplacement vide, c'est un déplacement. Échanger deux emplacements vides est refusé. L'échange ne déclenche rien, et n'est pas un lancer. Sans lui, Entrée sur un emplacement du triangle, sans bille prise dans la main, ne fait rien.
 
 Une pose se déroule ainsi :
 
@@ -362,7 +363,7 @@ Chaque choix a un mode, écrit sur la bille :
 - La question nomme la bille et le moment qui la posent : « Tic de gorille : vous devez choisir une bille de votre main à empocher. », « Final de porcelaine : vous pouvez polir jusqu'à 2 billes actives. ».
 - Le jeu attend le choix : rien d'autre ne peut se faire tant qu'il n'est pas fait. Pendant la résolution, elle s'arrête sur la question et reprend après le choix.
 - Une bille en transit n'est jamais proposée (section 2). Pendant un choix sur le triangle, l'emplacement vers lequel se dirige une bille en cours de lancer l'annonce après son contenu : « Agate, calot, pointe, usure 2 sur 3. En approche : loupe. ». Un emplacement vide l'annonce de même : « Pointe, vide. En approche : loupe. ».
-- Dans un choix facultatif, le menu propose « Ne rien choisir » tant que rien n'est choisi, puis « Terminer » ; sur le triangle, la touche T fait de même. Échap valide la sélection en cours ; sans aucune cible choisie, l'action est ignorée. Dans un choix obligatoire, ni « Ne rien choisir » ni « Terminer » : Échap redit la question.
+- Dans un choix facultatif, le menu propose « Ne rien choisir » tant que rien n'est choisi, puis « Terminer » ; sur le triangle, Maj+Entrée fait de même. Échap valide la sélection en cours ; sans aucune cible choisie, l'action est ignorée. Dans un choix obligatoire, ni « Ne rien choisir » ni « Terminer » : Échap redit la question.
 
 ### Les cibles vides
 
@@ -578,7 +579,7 @@ Une règle peut faire tout ce que fait un statut : changer une caractéristique,
 
 ### Les verrous
 
-Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut faire »), qu'il vienne d'une règle ou d'un statut ordinaire (« pas d'échange ce tour »). Une action verrouillée est refusée avec sa raison : « Échange interdit par la règle : terrain étroit. », « Remplacement interdit par le statut : … ».
+Un **verrou** est un comportement de statut (section 12, « Ce qu'un statut peut faire »), qu'il vienne d'une règle ou d'un statut ordinaire (« pas d'échange ce tour »). Une action verrouillée est refusée avec sa raison : « Échange interdit par la règle : … », « Remplacement interdit par le statut : … ».
 
 ### Les consulter
 
@@ -597,7 +598,7 @@ Des définitions provisoires, pour tester les mécaniques ; leurs valeurs sont d
 | défi cible | 165 points en 8 tours | imposé : le sac de départ | aucune |
 | défi endurance | Impact de 10 minimum chaque tour, 20 tours au plus | du joueur, exactement 15 billes | aucune |
 | gravier | libre, 10 tours | du joueur | gravier : les gains de Vitesse et de Masse produits par un calot sont divisés par deux |
-| terrain étroit | libre, 10 tours | du joueur | un lancer de moins ; échange interdit |
+| terrain étroit | libre, 10 tours | du joueur | un lancer de moins |
 | sans pot | libre, 10 tours | du joueur | pot inerte : les billes du pot n'agissent pas |
 | silence | libre, 10 tours | du joueur | silence : le mot-clé Chiquenaude ne se déclenche plus |
 

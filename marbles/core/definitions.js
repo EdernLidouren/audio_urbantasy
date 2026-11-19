@@ -32,7 +32,10 @@
 //          partie s'arrête, ce sont les CONDITIONS DE FIN (END_CONDITIONS), qui
 //          découlent du nombre de tours et de l'objectif, plus la pioche impossible,
 //          commune à tous ;
-//   rules  ses RÈGLES, une liste (vide : aucune).
+//   rules  ses RÈGLES, une liste (vide : aucune) ;
+//   swap   (facultatif) l'ÉCHANGE de deux emplacements est-il permis ? Absent : la
+//          valeur par défaut (marbles/config/values.js/DEFAULT_GAME.swap, retiré du jeu
+//          actuel) ; un booléen sinon (swapEnabled).
 //
 // SÉRIALISATION : l'état porte une COPIE de sa définition (`state.definition`), jamais
 // une référence au registre. Une définition lue d'un fichier n'est dans aucun
@@ -42,6 +45,7 @@
 
 import { createSeed, nextRandom } from "../../lib/rng.js";
 import { bagMarbles, mergeBuildRules } from "./bags.js";
+import { DEFAULT_GAME } from "../config/values.js";
 
 // Les valeurs de départ (en-tête), dans l'ordre de leur validation.
 export const START_KEYS = Object.freeze(["firstTurnDraw", "drawPerTurn", "handSize", "throws", "potCapacity"]);
@@ -212,6 +216,17 @@ export function startingList(definition, seed, types, bag) {
 // Une valeur de départ de la partie (START_KEYS).
 export function startValue(state, key) {
   return state.definition.start[key];
+}
+
+// L'échange est-il permis par cette définition (en-tête, `swap`) ? Lu aussi par
+// l'aide du jeu, qui n'en parle que s'il l'est.
+export function swapAllowed(definition) {
+  return definition.swap ?? DEFAULT_GAME.swap;
+}
+
+// L'échange est-il permis dans cette partie ?
+export function swapEnabled(state) {
+  return swapAllowed(state.definition);
 }
 
 // Le nombre de tours de la partie, ou null (sans limite).

@@ -30,7 +30,7 @@
 import { createMarblesGame, startMarblesGame, legalActions, lockReason, marblesReduce, nextTurnDraw, placeRefusal, swapRefusal, throwRefusal, throwsLeft } from "./marbles.js";
 import { appliedStatusesOf, keywordsOf, maxWearOf } from "./content.js";
 import { validateGameDefinitions, validateMarbleStatuses, validateMarbleTypes } from "./validation.js";
-import { NO_DEFINITIONS, buildRulesOf } from "./definitions.js";
+import { NO_DEFINITIONS, buildRulesOf, swapEnabled } from "./definitions.js";
 import { NO_BAGS, bagProblems, validatePresetBags } from "./bags.js";
 import { BAG_BUILD_RULES } from "../config/values.js";
 import { NO_STATUSES, characteristic } from "./statuses.js";
@@ -78,6 +78,9 @@ export function createMarblesRules(types, statuses = NO_STATUSES, definitions = 
     // Les lancers restants, les refus de lancer et de pose, les actions légales.
     throwsLeft: (state) => throwsLeft(state, statuses),
     swapRefusal: (state) => swapRefusal(state, statuses),
+    // L'échange fait-il partie de cette partie (sa définition) ? Faux : l'écran ne le
+    // propose pas, sans rien dire.
+    swapEnabled: (state) => swapEnabled(state),
     throwRefusal: (state) => throwRefusal(state, statuses),
     placeRefusal: (state, handIndex, slot) => placeRefusal(state, handIndex, slot, statuses),
     legalActions: (state) => legalActions(state, statuses),

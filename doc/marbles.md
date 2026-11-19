@@ -122,6 +122,12 @@ simulation (`marbles/core/marbles.js`) :
   tour et `drawPerTurn` ensuite, passée par les statuts) ; `"play"`, l'échange (`swap`),
   les poses (`place`) et la résolution (`resolve`) ; `"over"`, la partie finie. Ces
   valeurs viennent de la définition de la partie (voir « Définitions de partie »).
+- **L'échange, retiré du jeu actuel** : le mécanisme reste entier dans le moteur, mais
+  une définition qui ne le permet pas (`swap`, par défaut `DEFAULT_GAME.swap`, à false)
+  le refuse avant tout le reste (`swapDisabled`) ; il sort alors des actions légales
+  (les joueurs automatiques ne l'essaient plus), et l'écran ne le propose pas
+  (`rules.swapEnabled`). La définition de test des vérifications le permet, pour qu'il
+  reste vérifié.
 - **Les lancers** : `throwsUsed` compte les poses du tour, bornées par la
   caractéristique « lancers » en vigueur (`throws` de la définition, plus les statuts). Lancers
   épuisés : `noThrowsLeft`, que l'écran oppose dès la prise de la bille
@@ -1220,6 +1226,7 @@ outils), validée de même (`validateGameDefinition`). Une définition :
 | `turns` | le nombre de tours ; null, sans limite, pour un objectif qui le permet |
 | `goal` | l'objectif (`GOALS`) : `{ kind: "free", tiers }`, `{ kind: "target", score }`, `{ kind: "endurance", minimum }` |
 | `rules` | les règles, des ids de statuts de durée `game` (vide : aucune) |
+| `swap` | facultatif, un booléen : l'échange est-il permis ? Absent : `DEFAULT_GAME.swap` (`marbles/config/values.js`), false aujourd'hui, l'échange étant retiré du jeu (`swapAllowed`, `swapEnabled`) |
 
 **Sérialisation : par COPIE.** `createMarblesGame` copie la définition dans l'état
 (`state.definition`), jamais une référence au registre : une définition lue d'un
@@ -1557,14 +1564,16 @@ Ce qui se dit, selon l'endroit :
 | Emplacement vide, bille sélectionnée | « pointe » |
 | R | la vue d'ensemble du tour (voir plus bas) |
 | L | le menu de l'historique (voir plus bas) |
-| I | tour, score, Vitesse et Masse du tour, lancers restants, échange |
+| I | score, Vitesse et Masse du tour ; la disponibilité de l'échange dans une partie qui le permet seulement (`describeScore`) |
+| T | le tour, sur le nombre de tours s'il y en a un : « Tour 3 sur 10. », « Tour 5. » (`describeTurn`) |
+| C | les caractéristiques, chacune sur son maximum en vigueur, statuts compris : « 2 sur 3 lancers, 3 sur 5 billes en main, 0 sur 3 billes dans le pot. » ; les lancers sont ceux qui restent ce tour (`describeCharacteristics`) |
 | S | nombre de billes au sac, et la pioche du prochain début de tour, statuts compris (`rules.nextTurnDraw`) |
 | D | nombre de billes en défausse |
-| P | le pot : ses billes sur sa capacité en vigueur, et les billes perdues |
+| P | le pot : ses billes, et les billes perdues ; sa capacité se dit avec C |
 | A | les statuts de la partie (voir « Statuts (A, Maj+A) ») |
 
 Ces lignes d'état ont leurs textes sous `marbles.state.*` (`bag`, `discard`, `pot`,
-`turn`, `throws`, `swap_*`) ; `marbles.status.<id>.*` reste le nom et la description d'un
+`turn`, `score`, `characteristics`, `swap_*`) ; `marbles.status.<id>.*` reste le nom et la description d'un
 statut.
 
 Le calibre se dit juste après le nom, dans l'annonce principale seulement ; la fiche n'en dit
@@ -1640,9 +1649,9 @@ choix du joueur ». Les gabarits :
   (`target`, `limit`, `effect`), pour éviter « à jusqu'à » : « vous pouvez donner Vitesse
   +2 à 2 billes actives au plus » ;
 - après une cible, `marbles.choice.more.optional` ou `.required` ;
-- dans un choix facultatif, l'indication de la touche T, « T pour ne rien choisir. »
-  tant que rien n'est choisi, « T pour terminer. » ensuite (`decline_hint`,
-  `finish_hint`) ;
+- dans un choix facultatif, l'indication de la touche, « Maj+Entrée pour ne rien
+  choisir. » tant que rien n'est choisi, « Maj+Entrée pour terminer. » ensuite
+  (`decline_hint`, `finish_hint`) ;
 - le préfixe, la bille et le moment qui la posent (`marbles.choice.by_*` : une phase, un
   déclencheur, le pot, une entrée au pot, un statut) ;
 - chaque cible choisie se dit (`marbles.choice.chosen`, « X choisie. »).
@@ -1668,9 +1677,9 @@ choix du joueur ». Les gabarits :
   du triangle.
 - **Les deux zones** : on passe de l'une à l'autre comme d'habitude, le nom de la zone
   annoncé ; une seule zone : l'autre n'existe pas pour le curseur.
-- **Entrée** choisit ; **T** fait comme « Ne rien choisir » ou « Terminer » dans un choix
+- **Entrée** choisit ; **Maj+Entrée** fait comme « Ne rien choisir » ou « Terminer » dans un choix
   facultatif (partout, sur le triangle surtout, qui n'a pas de menu ; refusé, « Ce choix est
-  obligatoire. », sinon) ; **Échap** fait comme T dans un choix facultatif (il valide la
+  obligatoire. », sinon) ; **Échap** fait comme Maj+Entrée dans un choix facultatif (il valide la
   sélection en cours ; rien de choisi : l'action est ignorée, et cela se dit), et redit la
   question dans un choix obligatoire, qui ne se ferme pas (le jeu ne peut continuer sans
   lui). Ne rien choisir n'est pas une erreur : les joueurs automatiques le peuvent aussi
@@ -1678,8 +1687,8 @@ choix du joueur ». Les gabarits :
 - Fiches (Ctrl+haut, Ctrl+bas) et mots-clés (E, Maj+E) marchent sur chaque option ; R est
   refusé pendant le choix.
 
-T était libre dans l'écran des billes ; elle porte l'aide « Ne rien choisir, ou terminer
-un choix facultatif ».
+Maj+Entrée porte l'aide « Ne rien choisir, ou terminer un choix facultatif » ; T dit le
+tour.
 
 ### Fiches de détail
 
@@ -2139,8 +2148,8 @@ touches : ni V ni F n'étaient liées dans ces écrans, ni par une touche global
   jouer. »), puis « Partie terminée. », le résultat selon l'objectif (`resultText` :
   palier, victoire ou échec, tours tenus), puis le score final. `tierReached` dit un
   palier franchi en cours de partie.
-- **Refus d'un verrou** : `refusalText`, « Échange interdit par la règle : terrain
-  étroit. », ou « par le statut : … ».
+- **Refus d'un verrou** : `refusalText`, « Échange interdit par la règle : … », ou
+  « par le statut : … ».
 - **Sons** : des points d'accroche sans fichier (`MARBLES_AUDIO` à null : `victory`,
   `defeat`, `tier`, `enduranceEnd`), joués au centre par le palier franchi et la fin de
   partie ; un son à null ne joue rien, et ne se précharge pas.

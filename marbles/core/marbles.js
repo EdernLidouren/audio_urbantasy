@@ -141,7 +141,7 @@ import { SLOTS, nextSlot, previousSlot } from "./zones.js";
 import { emptyTally } from "./tally.js";
 import { TALLY_COUNTERS, maxWearOf } from "./content.js";
 import { validateGameDefinition } from "./validation.js";
-import { buildRulesOf, endReached, gameResult, startValue, startingList, tierOf, turnLimit } from "./definitions.js";
+import { buildRulesOf, endReached, gameResult, startValue, startingList, swapEnabled, tierOf, turnLimit } from "./definitions.js";
 import { NO_BAGS, bagProblems, describeProblem, validateBagFormat } from "./bags.js";
 import { BAG_BUILD_RULES } from "../config/values.js";
 import { drawMarbles, holdReactions, intercept, noteModification, shuffled, sourceOf, transact } from "./run.js";
@@ -160,6 +160,9 @@ export const MARBLE_ERRORS = [
   "unknownAction",
   "invalidSlot",
   "invalidHandIndex",
+  // L'échange absent de la partie (sa définition, marbles/core/definitions.js/
+  // swapEnabled) : jamais proposé, ni par l'écran ni aux joueurs automatiques.
+  "swapDisabled",
   "swapAlreadyUsed",
   "swapAfterPlacement",
   "swapSameSlot",
@@ -279,6 +282,7 @@ function isSlot(slot) {
 export function swapRefusal(state, statuses = NO_STATUSES) {
   const refusal = stageRefusal(state, "play");
   if (refusal) return refusal;
+  if (!swapEnabled(state)) return "swapDisabled";
   if (isLocked(state.statuses, statuses, "swap")) return LOCKS.swap.refusal;
   if (state.swapUsed) return "swapAlreadyUsed";
   if (state.throwsUsed > 0) return "swapAfterPlacement"; // l'échange précède la pose

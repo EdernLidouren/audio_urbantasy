@@ -9,10 +9,10 @@ import { auditNonSerializable, throws } from "../../lib/check.js";
 import { SLOTS, impactOf, legalActions, nextSlot, previousSlot, swapRefusal, placeRefusal, throwRefusal, throwsLeft } from "../core/marbles.js";
 import { JOURNAL_EVENTS, buildMarbleKeywords, validateMarblePhases, validateMarbleTriggers } from "../core/content.js";
 import { validateMarbleTypes } from "../core/validation.js";
-import { MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
+import { DEFAULT_GAME, MARBLE_PHASES, MARBLE_POCKET, MARBLE_TRIGGERS } from "../config/values.js";
 import { CLAUSE_ACTIONS, amountOf, printedStat } from "../core/effects.js";
 import { LARGE, MARBLE_SIZES, MEDIUM, SMALL } from "../config/values.js";
-import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_DEFINITION, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { CHOICELESS_TYPES, FIXTURE_BAG, FIXTURE_DEFINITION, FIXTURE_TYPES, fixtureBag, fixtureDefinition, fixtureRules } from "./fixtures/marbles.js";
 import { turnLimit } from "../core/definitions.js";
 import { answerChoices, caughtMessage, deepFreeze, eventTypes, fabricatedRules, handIds, inHand, marbleCount, marblesPlayState, mustReduce, placed, playRandomMarblesGame, triangleOf, validateTable, withSizes } from "./helpers.js";
 
@@ -371,6 +371,18 @@ function checkSwap(run) {
   run("échange : deux vides refusés", "swapBothEmpty", rules.reduce(playState({ triangle: triangleOf(agingFlick, null, null) }), { type: "swap", a: "rightBase", b: "apex" }).error);
   run("échange : même emplacement refusé", "swapSameSlot", rules.reduce(playState({ triangle: triangleOf(agingFlick, null, null) }), { type: "swap", a: "leftBase", b: "leftBase" }).error);
   run("échange : emplacement inconnu refusé", "invalidSlot", rules.reduce(playState(), { type: "swap", a: "leftBase", b: "top" }).error);
+
+  // L'ÉCHANGE RETIRÉ (la définition, `swap`) : refusé avant tout le reste, jamais
+  // proposé aux joueurs automatiques ; une définition qui ne le déclare pas suit la
+  // valeur par défaut du jeu (DEFAULT_GAME.swap).
+  const swapless = playState({ triangle: triangleOf(agingFlick, hitPolish, null), swap: false });
+  run("échange retiré : refusé", "swapDisabled", rules.reduce(swapless, { type: "swap", a: "leftBase", b: "rightBase" }).error);
+  run("échange retiré : absent des actions légales", false, rules.legalActions(swapless).some((action) => action.type === "swap"));
+  run("échange retiré : la pose reste permise", true, rules.legalActions({ ...swapless, hand: inHand(["one_shot"]) }).some((action) => action.type === "place"));
+  run("échange permis : dans les actions légales", true, rules.legalActions(playState({ triangle: triangleOf(agingFlick, hitPolish, null) })).some((action) => action.type === "swap"));
+  const { swap: _swap, ...undeclared } = swapless.definition;
+  run("échange non déclaré : la valeur par défaut du jeu", DEFAULT_GAME.swap, rules.swapEnabled({ ...swapless, definition: undeclared }));
+  run("échange : une valeur non booléenne refusée au chargement", true, throws(() => rules.createGame(1, fixtureDefinition({ swap: "oui" }), { bag: fixtureBag() })));
 
   // Un refus ne consomme rien : l'état rendu est l'état reçu.
   const state = playState({ triangle: triangleOf(agingFlick, null, null) });

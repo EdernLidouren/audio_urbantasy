@@ -23,6 +23,11 @@ export const DEFAULT_GAME = {
   },
   // Le nombre de tours (definition.turns).
   turns: 10,
+  // L'ÉCHANGE de deux emplacements (definition.swap) : retiré du jeu actuel, le
+  // mécanisme reste dans le moteur. Une définition qui ne le déclare pas suit cette
+  // valeur ; à true, le moteur, l'écran (Entrée sur un emplacement, l'annonce de I)
+  // et les joueurs automatiques le retrouvent ensemble.
+  swap: false,
   // Les PALIERS de la partie libre (definition.goal.tiers) : des repères techniques
   // PROVISOIRES, tirés du simulateur (joueur glouton, sac de départ, 1000 parties,
   // graine 1, set révisé de novembre 2026) : les 25e, 50e et 90e centiles du score

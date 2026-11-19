@@ -51,6 +51,8 @@ import {
   describeSlotFocus,
   describeSlotForPlacement,
   describeTurn,
+  describeScore,
+  describeCharacteristics,
   formatCounter,
   instanceLabel,
   originText,
@@ -96,7 +98,7 @@ import {
 import { pathLength, rollAt, rollDurationMs, rollEnvelope } from "../view/rolls.js";
 import { EMPTY_SOUND_QUEUE, advanceSoundQueue, enqueueCues } from "../view/sound-queue.js";
 import { throws } from "../../lib/check.js";
-import { CHOICELESS_TYPES, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureRules } from "./fixtures/marbles.js";
+import { CHOICELESS_TYPES, FIXTURE_DEFINITION, FIXTURE_STATUSES, FIXTURE_TYPES, fixtureDefinition, fixtureRules } from "./fixtures/marbles.js";
 import { choice, draw, polish, speed } from "../content/effects.js";
 import { ruleInstance } from "../core/statuses.js";
 import { answerChoices, emptyBagMarblesGame, fabricatedRules, inHand, isCleanText, keyText, marblesPlayState, mustReduce, overState, statusInstance } from "./helpers.js";
@@ -660,11 +662,13 @@ function checkHelpMenu(run) {
   const { handSize: maxHandSize, throws: throwsPerTurn, firstTurnDraw, drawPerTurn, potCapacity } = start;
   run(
     "aide H : la main cite les réglages du jeu",
-    `help.hand.text{turns: ${turnCount}, hand: ${maxHandSize}, throws: ${throwsPerTurn}, firstDraw: ${firstTurnDraw}, draw: ${drawPerTurn}, pot: ${potCapacity}}`,
+    `help.hand.text{turns: ${turnCount}, hand: ${maxHandSize}, throws: ${throwsPerTurn}, firstDraw: ${firstTurnDraw}, draw: ${drawPerTurn}, pot: ${potCapacity}, swap: yes}`,
     helpTopicText("hand", FIXTURE_DEFINITION, t)
   );
   run("aide H : le but du jeu, ses propres textes et les mêmes réglages", helpTopicText("hand", FIXTURE_DEFINITION, t).replace("help.hand.", "help.goal."), helpTopicText("goal", FIXTURE_DEFINITION, t));
-  run("aide H : le pot cite sa capacité", true, helpTopicText("zones", FIXTURE_DEFINITION, t).endsWith(`pot: ${potCapacity}}`));
+  run("aide H : le pot cite sa capacité", true, helpTopicText("zones", FIXTURE_DEFINITION, t).includes(`pot: ${potCapacity},`));
+  // L'échange ne se présente que dans une partie qui le permet (la définition).
+  run("aide H : sans échange, la main n'en parle pas", true, helpTopicText("hand", fixtureDefinition({ swap: false }), t).endsWith("swap: no}"));
   setLocale("fr");
   run("aide H : les mots-clés renvoient à E et Maj+E", true, plain(helpTopicText("keywords", FIXTURE_DEFINITION, realT)).includes("touche E") && plain(helpTopicText("keywords", FIXTURE_DEFINITION, realT)).includes("Maj+E"));
   for (const lang of ["fr", "en"]) {
@@ -851,9 +855,9 @@ function checkChoiceInterface(run) {
 // La touche P : le pot et les billes perdues, accords compris.
 function checkPotStatus(run) {
   const game = (pot, lost) => ({ ...rules.createGame(1), pot, lost });
-  run("touche P : vide", "state.pot{count: 0, capacity: 3, lost: 0}", describePot(game([], []), rules, t));
-  run("touche P : une de chaque", "state.pot{count: 1, capacity: 3, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), rules, t));
-  run("touche P : pluriels", "state.pot{count: 3, capacity: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), rules, t));
+  run("touche P : vide", "state.pot{count: 0, lost: 0}", describePot(game([], []), t));
+  run("touche P : une de chaque", "state.pot{count: 1, lost: 1}", describePot(game(["aging_flick"], ["hit_polish"]), t));
+  run("touche P : pluriels", "state.pot{count: 3, lost: 2}", describePot(game(["aging_flick", "hit_polish", "final_pocket"], ["awaken_draw", "all_rounder"]), t));
   run("Maj+P : le titre du menu", "pile.pot", t("marbles.pile.pot"));
 }
 
@@ -1673,11 +1677,13 @@ function checkLocales(run, { events, state }) {
 
       const emptyTriangle = { leftBase: null, rightBase: null, apex: null };
       const lines = [
-        describeTurn(state, true, rules, realT),
-        describeTurn(state, false, rules, realT),
+        describeTurn(state, realT),
+        describeScore(state, true, rules, realT),
+        describeScore(state, false, rules, realT),
+        describeCharacteristics(state, rules, realT),
         describeBag(state, rules, realT),
         describeDiscard(state, realT),
-        describeTurn({ ...state, speed: -3, mass: -1 }, true, rules, realT),
+        describeScore({ ...state, speed: -3, mass: -1 }, true, rules, realT),
         stepsText(buildSteps([{ type: "impact", speed: -3, mass: -1, impact: 0, score: 0 }], realT)),
         describeHandFocus({ ...state, hand: inHand([]) }, 0, rules, realT),
         ...SLOTS.map((slot) => describeSlotFocus({ ...state, triangle: emptyTriangle }, slot, rules, realT)),
@@ -1865,10 +1871,13 @@ function checkSaid(run, { events, state }) {
     run("texte : tally_flick dit son don à la pointe", "outcome.slot{slot: slot.leftBase, marble: <tally_flick>, effect: effect.combined{parts: [effect.given{effect: effect.combined{parts: [effect.speed_up{amount: 4}]}, slot: slot.apex}]}}", lensedSteps[1]);
     run("texte : le bonus s'entend chez qui le reçoit", "outcome.slot{slot: slot.apex, marble: <hit_pocket>, effect: effect.combined{parts: [effect.speed_up{amount: 10}]}}", lensedSteps[2]);
     run.same("étapes : aucune étape silencieuse", [], buildSteps(events, t).filter((step) => step.text === ""));
+    run("texte : le tour, seul (T)", "state.turn{turn: 2, turnCount: 10}", describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, t));
+    run("texte : le score et les compteurs, l'échange permis (I)", "state.score{score: 5, speed: 5, mass: 2} state.swap_available", describeScore({ ...lensed, score: 5, speed: 5, mass: 2 }, true, rules, t));
+    run("texte : sans échange, I n'en parle pas", "state.score{score: 5, speed: 5, mass: 2}", describeScore(overState({ ...lensed, score: 5, speed: 5, mass: 2 }, { swap: false }), true, rules, t));
     run(
-      "texte : le tour, compteurs compris",
-      "state.turn{turn: 2, turnCount: 10, score: 5, speed: 5, mass: 2} state.throws{count: 4} state.swap_available",
-      describeTurn({ ...lensed, score: 5, speed: 5, mass: 2 }, true, rules, t)
+      "texte : les caractéristiques sur leurs maximums, statuts compris (C)",
+      "state.characteristics{throws: 4, throwsMax: 5, hand: 0, handSize: 5, pot: 1, potCapacity: 3}",
+      describeCharacteristics({ ...lensed, hand: [], pot: ["clay"] }, rules, t)
     );
 
   }
@@ -1955,27 +1964,29 @@ const WITNESSES = {
       "Pointe : Vitesse +4.",
       "Base : Vitesse +1.",
     ],
-    question: "Tic de dauphin : vous pouvez polir une bille active. T pour ne rien choisir.",
+    question: "Tic de dauphin : vous pouvez polir une bille active. Maj+Entrée pour ne rien choisir.",
     questions: [
-      "Tic de dauphin : vous pouvez polir jusqu'à 2 billes actives. T pour ne rien choisir.",
+      "Tic de dauphin : vous pouvez polir jusqu'à 2 billes actives. Maj+Entrée pour ne rien choisir.",
       "Tic de dauphin : vous devez choisir une bille active à polir.",
       "Tic de dauphin : vous devez choisir 2 billes actives à polir.",
-      "Tic de dauphin : vous pouvez éjecter une bille active. T pour ne rien choisir.",
+      "Tic de dauphin : vous pouvez éjecter une bille active. Maj+Entrée pour ne rien choisir.",
       "Tic de dauphin : vous devez choisir une bille active à éjecter.",
-      "Tic de dauphin : vous pouvez donner Vitesse +2 à 2 billes actives au plus. T pour ne rien choisir.",
-      "Vous pouvez encore polir une bille active. T pour terminer.",
+      "Tic de dauphin : vous pouvez donner Vitesse +2 à 2 billes actives au plus. Maj+Entrée pour ne rien choisir.",
+      "Vous pouvez encore polir une bille active. Maj+Entrée pour terminer.",
       "Vous devez encore choisir une bille active.",
     ],
     chosen: [
       "agate choisie.",
       "dragon choisi.",
     ],
-    turn: "Tour 2 sur 10. Score 5. Vitesse 5, Masse 2. 4 lancers restants. Échange disponible.",
+    turn: "Tour 2 sur 10.",
+    score: "Score 5. Vitesse 5, Masse 2. Échange disponible.",
+    characteristics: ["4 sur 5 lancers, 3 sur 5 billes en main, 0 sur 3 billes dans le pot.", "1 sur 1 lancer, 1 sur 1 bille en main, 1 sur 1 bille dans le pot."],
     bag: [
       "Encore 8 billes dans le sac, 1 bille à piocher en début de tour.",
       "Encore 1 bille dans le sac, 1 bille à piocher en début de tour.",
     ],
-    pot: "1 bille sur 3 dans le pot, 2 billes perdues.",
+    pot: "1 bille dans le pot, 2 billes perdues.",
     impact: "Impact 0. Score 14.",
   },
   en: {
@@ -1997,27 +2008,29 @@ const WITNESSES = {
       "Apex: Speed +4.",
       "Base: Speed +1.",
     ],
-    question: "Hit from dolphin: you may polish an active marble. T to choose nothing.",
+    question: "Hit from dolphin: you may polish an active marble. Shift+Enter to choose nothing.",
     questions: [
-      "Hit from dolphin: you may polish up to 2 active marbles. T to choose nothing.",
+      "Hit from dolphin: you may polish up to 2 active marbles. Shift+Enter to choose nothing.",
       "Hit from dolphin: you must choose an active marble to polish.",
       "Hit from dolphin: you must choose 2 active marbles to polish.",
-      "Hit from dolphin: you may eject an active marble. T to choose nothing.",
+      "Hit from dolphin: you may eject an active marble. Shift+Enter to choose nothing.",
       "Hit from dolphin: you must choose an active marble to eject.",
-      "Hit from dolphin: you may give Speed +2 to 2 active marbles at most. T to choose nothing.",
-      "You may still polish an active marble. T to finish.",
+      "Hit from dolphin: you may give Speed +2 to 2 active marbles at most. Shift+Enter to choose nothing.",
+      "You may still polish an active marble. Shift+Enter to finish.",
       "You must still choose an active marble.",
     ],
     chosen: [
       "agate chosen.",
       "dragon chosen.",
     ],
-    turn: "Turn 2 of 10. Score 5. Speed 5, Mass 2. 4 throws left. Swap available.",
+    turn: "Turn 2 of 10.",
+    score: "Score 5. Speed 5, Mass 2. Swap available.",
+    characteristics: ["4 of 5 throws, 3 of 5 marbles in hand, 0 of 3 marbles in the pot.", "1 of 1 throw, 1 of 1 marble in hand, 1 of 1 marble in the pot."],
     bag: [
       "8 marbles left in the bag, 1 marble to draw at the start of the turn.",
       "1 marble left in the bag, 1 marble to draw at the start of the turn.",
     ],
-    pot: "1 marble of 3 in the pot, 2 lost marbles.",
+    pot: "1 marble in the pot, 2 lost marbles.",
     impact: "Impact 0. Score 14.",
   },
 };
@@ -2062,9 +2075,14 @@ function checkWitnesses(run) {
       question: plain(describeChoicePrompt(choosing.pendingChoice, realT)),
       questions: questionVariants(choosing.pendingChoice).map((pending) => plain(describeChoicePrompt(pending, realT))),
       chosen: ["agate", "dragon"].map((marble) => plain(realT("marbles.choice.chosen", { marble: nameRef(`marble.${marble}.name`) }))),
-      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, rules, realT)),
+      turn: plain(describeTurn(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), realT)),
+      score: plain(describeScore(game({ score: 5, speed: 5, mass: 2, throwsUsed: 1 }), true, rules, realT)),
+      characteristics: [
+        plain(describeCharacteristics(game({ throwsUsed: 1, hand: inHand(["clay", "clay", "clay"]), pot: [] }), rules, realT)),
+        plain(describeCharacteristics(game({ throws: 1, handSize: 1, potCapacity: 1, hand: inHand(["clay"]), pot: ["clay"] }), rules, realT)),
+      ],
       bag: [8, 1].map((count) => plain(describeBag(game({ bag: Array(count).fill("clay"), drawPerTurn: 1 }), rules, realT))),
-      pot: plain(describePot(game({ pot: ["clay"], lost: ["dragon", "dolphin"] }), rules, realT)),
+      pot: plain(describePot(game({ pot: ["clay"], lost: ["dragon", "dolphin"] }), realT)),
       impact: plain(stepsText(buildSteps([{ type: "impact", speed: -3, mass: 2, impact: 0, score: 14 }], realT))),
     };
   };
@@ -2080,6 +2098,8 @@ function checkWitnesses(run) {
       run.same(`témoin ${locale} : les questions selon le mode, au singulier et au pluriel, et les relances`, WITNESSES[locale].questions, witness.questions);
       run.same(`témoin ${locale} : une bille choisie, accordée`, WITNESSES[locale].chosen, witness.chosen);
       run(`témoin ${locale} : le tour`, WITNESSES[locale].turn, witness.turn);
+      run(`témoin ${locale} : le score et les compteurs`, WITNESSES[locale].score, witness.score);
+      run.same(`témoin ${locale} : les caractéristiques, pluriel et singulier`, WITNESSES[locale].characteristics, witness.characteristics);
       run.same(`témoin ${locale} : le sac, pluriel et singulier`, WITNESSES[locale].bag, witness.bag);
       run(`témoin ${locale} : le pot et les billes perdues`, WITNESSES[locale].pot, witness.pot);
       run(`témoin ${locale} : l'Impact et le Score`, WITNESSES[locale].impact, witness.impact);
@@ -2137,5 +2157,5 @@ function checkGoalNarration(run) {
   run("fin de partie : le résultat puis le score", "event.game_over{score: 9, result: result.defeat}", over("lastTurn"));
   run("fin de partie, plus aucune bille : la raison d'abord", "result.no_marbles event.game_over{score: 9, result: result.defeat}", over("noMarbles"));
   run("palier atteint : dit", "event.tier_reached{tier: tier.bronze}", stepsText(buildSteps([{ type: "tierReached", tier: "bronze", score: 20 }], t)));
-  run("tour sans limite : sans « sur »", true, describeTurnLine(game({ goal: { kind: "endurance", minimum: 15 }, turns: null }), true, rules, t).startsWith("state.turn_unlimited{"));
+  run("tour sans limite : sans « sur »", true, describeTurnLine(game({ goal: { kind: "endurance", minimum: 15 }, turns: null }), t).startsWith("state.turn_unlimited{"));
 }

@@ -273,6 +273,21 @@ function checkSwap(run) {
   } finally {
     bench.close();
   }
+  // Une partie SANS ÉCHANGE (sa définition) : Entrée sur un emplacement ne fait rien,
+  // ni son, ni annonce, ni sélection ; la pose depuis la main reste entière.
+  const swapless = openScreenBench(rules, playState({ hand: inHand(["one_shot"]), triangle: { leftBase: placed("aging_flick"), rightBase: placed("hit_polish"), apex: null }, swap: false }));
+  try {
+    swapless.key("ArrowUp");
+    const [said, sounds] = [swapless.said.length, swapless.sounds.length];
+    swapless.key("Enter");
+    swapless.key("ArrowRight");
+    swapless.key("Enter");
+    run("sans échange : Entrée sur un emplacement, aucune annonce de plus que le déplacement", 1, swapless.said.length - said);
+    run("sans échange : aucun son de sélection ni de refus", false, swapless.sounds.slice(sounds).some((sound) => sound.name === "playMenuSound" && ["select", "refusal", "block"].includes(sound.args[0])));
+    run.same("sans échange : rien d'échangé", ["aging_flick", "hit_polish"], [swapless.game().triangle.leftBase.marble, swapless.game().triangle.rightBase.marble]);
+  } finally {
+    swapless.close();
+  }
 }
 
 // Maj+R : la première étape aussitôt, les suivantes une par battement, chacune
@@ -372,7 +387,7 @@ function checkChoiceDuringResolution(run) {
     run("réponse : la cible choisie se dit", "choice.chosen{marble: <final_pocket>}", bench.said.at(-1));
     playOut();
     run("réponse : la question suivante, en séquence", true, bench.said.at(-1).startsWith("choice.more.optional{") && bench.said.at(-1).endsWith("choice.finish_hint"));
-    bench.key("t");
+    bench.key("Enter", ["shift"]);
     playOut();
     run("Terminer : la résolution reprise jusqu'à l'Impact", true, bench.said.some((text) => text.includes("event.impact{")));
     run("Terminer : plus de choix en attente", null, bench.game().pendingChoice);
@@ -503,12 +518,12 @@ function checkChoiceModes(run) {
   try {
     placeOnApex(required);
     const question = required.said.at(-1);
-    run("obligatoire : la question dit ce qu'on doit choisir, sans indication de T", true, question.includes("choice.question.required{") && !question.includes("hint"));
+    run("obligatoire : la question dit ce qu'on doit choisir, sans indication de Maj+Entrée", true, question.includes("choice.question.required{") && !question.includes("hint"));
     required.key("Escape");
     // La pose s'est dite avec la question à sa suite ; Échap ne redit que la question.
     run("obligatoire : Échap redit la question", true, required.said.at(-1).startsWith("choice.by_hit{") && question.endsWith(required.said.at(-1)));
-    required.key("t");
-    run("obligatoire : T refusé, le choix attend toujours", true, required.game().pendingChoice !== null);
+    required.key("Enter", ["shift"]);
+    run("obligatoire : Maj+Entrée refusé, le choix attend toujours", true, required.game().pendingChoice !== null);
   } finally {
     required.close();
   }

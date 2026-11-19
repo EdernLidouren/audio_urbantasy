@@ -202,7 +202,8 @@ export function validateGameDefinition(definition, types, statuses = NO_STATUSES
     throw new Error(`marbles, définition "${definition?.id}" : ${message}`);
   };
   if (definition === null || typeof definition !== "object" || Array.isArray(definition)) fail("une définition est un objet.");
-  rejectUnknownFields(definition, ["id", "start", "bag", "turns", "goal", "rules"], "définition", fail);
+  rejectUnknownFields(definition, ["id", "start", "bag", "turns", "goal", "rules", "swap"], "définition", fail);
+  if (definition.swap !== undefined && typeof definition.swap !== "boolean") fail("swap doit être un booléen.");
   if (typeof definition.id !== "string" || definition.id === "") fail("id doit être un texte non vide.");
   validateStart(definition.start, fail);
   validateBagSource(definition.bag, types, bags, fail);

@@ -78,29 +78,44 @@ export function describeBag(game, rules, t) {
   return t("marbles.state.bag", { count: game.bag.length, draw: rules.nextTurnDraw(game) });
 }
 
-// Le pot (touche P) : « 2 billes sur 3 dans le pot, 1 bille perdue. ». La capacité en
-// vigueur, statuts compris (les règles, rules.characteristic).
-export function describePot(game, rules, t) {
-  return t("marbles.state.pot", { count: game.pot.length, capacity: rules.characteristic(game, "potCapacity"), lost: game.lost.length });
+// Le pot (touche P) : « 2 billes dans le pot, 1 bille perdue. ». Sa capacité se dit
+// avec les autres caractéristiques (touche C, describeCharacteristics).
+export function describePot(game, t) {
+  return t("marbles.state.pot", { count: game.pot.length, lost: game.lost.length });
+}
+
+// Les CARACTÉRISTIQUES de la partie (touche C), chacune sur son maximum en vigueur,
+// statuts compris (les règles, rules.characteristic) : « 2 sur 3 lancers, 3 sur 5
+// billes en main, 0 sur 3 billes dans le pot. ». Les lancers comptés sont ceux qui
+// restent ce tour (rules.throwsLeft).
+export function describeCharacteristics(game, rules, t) {
+  return t("marbles.state.characteristics", {
+    throws: rules.throwsLeft(game),
+    throwsMax: rules.characteristic(game, "throws"),
+    hand: game.hand.length,
+    handSize: rules.characteristic(game, "handSize"),
+    pot: game.pot.length,
+    potCapacity: rules.characteristic(game, "potCapacity"),
+  });
 }
 
 export function describeDiscard(game, t) {
   return t("marbles.state.discard", { count: game.discard.length });
 }
 
-// Où en est le tour. Avec les lancers restants (statuts compris : rules.throwsLeft)
-// et la disponibilité de l'échange : rien d'autre ne permet de les savoir sans essayer.
-export function describeTurn(game, swapAvailable, rules, t) {
-  // Une partie sans limite de tours (une endurance) : « Tour 5. ».
-  const line = t(turnLimit(game) === null ? "marbles.state.turn_unlimited" : "marbles.state.turn", {
-    turn: game.turn,
-    turnCount: turnLimit(game),
-    score: game.score,
-    speed: formatCounter(game.speed),
-    mass: formatCounter(game.mass),
-  });
-  const throws = t("marbles.state.throws", { count: rules.throwsLeft(game) });
-  return `${line} ${throws} ${t(swapAvailable ? "marbles.state.swap_available" : "marbles.state.swap_unavailable")}`;
+// Le tour (touche T) : « Tour 3 sur 10. », ou « Tour 5. » dans une partie sans
+// limite de tours (une endurance).
+export function describeTurn(game, t) {
+  return t(turnLimit(game) === null ? "marbles.state.turn_unlimited" : "marbles.state.turn", { turn: game.turn, turnCount: turnLimit(game) });
+}
+
+// Le score et les compteurs du tour (touche I). Dans une partie où l'échange est
+// permis (rules.swapEnabled), sa disponibilité aussi : rien d'autre ne permet de la
+// savoir sans essayer.
+export function describeScore(game, swapAvailable, rules, t) {
+  const line = t("marbles.state.score", { score: game.score, speed: formatCounter(game.speed), mass: formatCounter(game.mass) });
+  if (!rules.swapEnabled(game)) return line;
+  return `${line} ${t(swapAvailable ? "marbles.state.swap_available" : "marbles.state.swap_unavailable")}`;
 }
 
 // L'ordre dans lequel le menu du sac se dit : alphabétique, sur le nom prononcé.

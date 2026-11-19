@@ -1,4 +1,4 @@
-// TERRAIN ÉTROIT : une partie libre, un lancer de moins et aucun échange.
+// TERRAIN ÉTROIT : une partie libre, un lancer de moins.
 import { DEFAULT_GAME } from "../../config/values.js";
 
 export default {
@@ -7,5 +7,5 @@ export default {
   bag: { kind: "player" },
   turns: DEFAULT_GAME.turns,
   goal: { kind: "free", tiers: DEFAULT_GAME.tiers },
-  rules: ["oneThrowLess", "noSwap"],
+  rules: ["oneThrowLess"],
 };

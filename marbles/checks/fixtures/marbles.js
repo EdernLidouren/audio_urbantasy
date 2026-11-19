@@ -308,10 +308,13 @@ export const FIXTURE_DEFINITION = deepFreeze({
   turns: 10,
   goal: { kind: "free", tiers: { bronze: 20, silver: 40, gold: 60 } },
   rules: [],
+  // L'échange, retiré du jeu actuel, reste vérifié : la définition de test le permet
+  // (un test le retire par `swap: false`).
+  swap: true,
 });
 
 // Les champs d'une définition qui ne sont pas des valeurs de départ.
-const DEFINITION_FIELDS = ["id", "bag", "turns", "goal", "rules"];
+const DEFINITION_FIELDS = ["id", "bag", "turns", "goal", "rules", "swap"];
 
 // Une définition de test dont certains champs sont remplacés, `over` À PLAT : une
 // valeur de départ par son nom (handSize, throws…), un autre champ de la définition par

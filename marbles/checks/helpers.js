@@ -110,7 +110,7 @@ export function marblesPlayState(rules, over = {}) {
 
 // Les champs de la DÉFINITION qu'un état fabriqué peut remplacer, à plat (`turns`, une
 // valeur de départ par son nom) ; tout autre champ est un champ de l'état.
-const DEFINITION_OVERRIDES = [...START_KEYS, "turns", "goal", "rules"];
+const DEFINITION_OVERRIDES = [...START_KEYS, "turns", "goal", "rules", "swap"];
 
 // Un état dont des champs sont remplacés, À PLAT : ceux de l'état (`bag` compris, le
 // sac de la partie), et ceux de sa définition (DEFINITION_OVERRIDES), sur une copie.

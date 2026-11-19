@@ -65,6 +65,8 @@ import {
   describeSlotFocus,
   describeSlotForPlacement,
   describeTurn,
+  describeScore,
+  describeCharacteristics,
   marbleName,
   placementLines,
   slotName,
@@ -107,7 +109,11 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   activate: { keys: ["Enter", " "], mods: [] },
   back: { keys: ["Escape"], mods: [] },
   reannounce: { keys: ["Backspace"], mods: [] },
-  turnInfo: { keys: ["i"], mods: [] },
+  // Le score et les compteurs du tour ; le tour ; les caractéristiques (lancers,
+  // main, pot, sur leurs maximums).
+  scoreInfo: { keys: ["i"], mods: [] },
+  turn: { keys: ["t"], mods: [] },
+  characteristics: { keys: ["c"], mods: [] },
   bag: { keys: ["s"], mods: [] },
   discard: { keys: ["d"], mods: [] },
   bagMenu: { keys: ["s"], mods: ["shift"] },
@@ -131,8 +137,8 @@ const MARBLES_BINDINGS = defineBindings("marbles", {
   // Ses familles, son calibre et sa rareté.
   identity: { keys: ["f"], mods: [] },
   // Terminer un choix facultatif (sur le triangle surtout : la main a son entrée
-  // « Ne rien choisir », puis « Terminer »). Libre dans cet écran.
-  finish: { keys: ["t"], mods: [] },
+  // « Ne rien choisir », puis « Terminer »).
+  finish: { keys: ["Enter"], mods: ["shift"] },
   // L'aide du jeu des billes. Libre dans cet écran : F1 et Maj+H sont des touches
   // globales (l'aide des touches), H seul n'est lié à rien.
   help: { keys: ["h"], mods: [] },
@@ -528,7 +534,7 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     answerChoice(answer.action);
   }
 
-  // T : terminer un choix facultatif ; un choix obligatoire le refuse.
+  // Maj+Entrée : terminer un choix facultatif ; un choix obligatoire le refuse.
   function finishChoice() {
     if (blockedByNarration()) return;
     const pending = getGame().pendingChoice;
@@ -632,6 +638,10 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
       else performSwap(held.slot, slot);
       return;
     }
+    // Une partie sans échange (sa définition) : Entrée sur un emplacement, sans bille
+    // prise dans la main, ne fait rien du tout, ni son ni annonce. C'est le geste
+    // attendu, pas une erreur.
+    if (!rules.swapEnabled(getGame())) return;
     const refusal = rules.swapRefusal(getGame());
     if (refusal) {
       refuse(refusal);
@@ -745,16 +755,18 @@ export function makeMarblesScreen(getGame, setGame, rules, { openKeyHelp = () =>
     activate,
     back,
     reannounce,
-    // Les lancers restants et l'échange : rien d'autre ne permet de les savoir sans
-    // essayer.
-    turnInfo: consult(() => describeTurn(getGame(), rules.swapRefusal(getGame()) === null, rules, t)),
+    scoreInfo: consult(() => describeScore(getGame(), rules.swapRefusal(getGame()) === null, rules, t)),
+    turn: consult(() => describeTurn(getGame(), t)),
+    // Les lancers restants, la main et le pot : rien d'autre ne permet de savoir les
+    // lancers sans essayer.
+    characteristics: consult(() => describeCharacteristics(getGame(), rules, t)),
     bag: consult(() => describeBag(getGame(), rules, t)),
     discard: consult(() => describeDiscard(getGame(), t)),
     // Le sac dans un ordre qui ne dévoile rien de la pioche ; la défausse et le pot
     // dans l'ordre d'arrivée.
     bagMenu: openMenu(() => openPileMenu("marbles.pile.bag", bagDisplayOrder(getGame().bag, t), rules, getGame())),
     discardMenu: openMenu(() => openPileMenu("marbles.pile.discard", getGame().discard, rules, getGame())),
-    pot: consult(() => describePot(getGame(), rules, t)),
+    pot: consult(() => describePot(getGame(), t)),
     potMenu: openMenu(() => openPileMenu("marbles.pile.pot", getGame().pot, rules, getGame())),
     statuses: consult(() => describeStatuses(getGame(), rules, t)),
     statusesMenu: openMenu(() => openStatusMenu(ordinaryInstances(getGame().statuses), rules)),
